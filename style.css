@@ -1,0 +1,534 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+    background: #f5f5f5;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+}
+
+.container {
+    max-width: 1400px;
+    width: 100%;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* Header */
+.header {
+    padding: 24px 32px;
+    background: #2c3e50;
+    color: white;
+}
+
+.header h1 {
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.header p {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+/* Configuration Panel */
+.config-panel {
+    background: #f8f9fa;
+    padding: 24px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.config-panel h2 {
+    font-size: 18px;
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.config-section {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.config-section h3 {
+    font-size: 14px;
+    text-transform: uppercase;
+    color: #7f8c8d;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+}
+
+.full-width {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.params-container {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #eee;
+}
+
+.param-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.param-row label {
+    width: 100px;
+    font-size: 13px;
+    color: #2c3e50;
+}
+
+.param-row input[type="number"] {
+    flex: 1;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+/* Radio Group */
+.radio-group {
+    display: flex;
+    gap: 20px;
+}
+
+.radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: #2c3e50;
+    cursor: pointer;
+}
+
+/* Buttons */
+.button {
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.button.primary {
+    background: #3498db;
+    color: white;
+}
+
+.button.primary:hover {
+    background: #2980b9;
+}
+
+.button.secondary {
+    background: #e67e22;
+    color: white;
+}
+
+.button.secondary:hover {
+    background: #d35400;
+}
+
+.button.export {
+    background: #27ae60;
+    color: white;
+}
+
+.button.export:hover {
+    background: #229954;
+}
+
+/* Results Container */
+.results-container {
+    padding: 24px;
+    min-height: 500px;
+}
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    color: #95a5a6;
+    font-size: 16px;
+}
+
+/* Interactive View */
+.interactive-view {
+    animation: fadeIn 0.3s;
+}
+
+.visualization-area {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.canvas-container {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+#mainCanvas {
+    width: 100%;
+    min-width: 300px;
+    min-height: 300px;
+    aspect-ratio: 1 / 1;
+    background: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+/* Generation Controls */
+.gen-controls {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.gen-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.gen-label {
+    font-size: 14px;
+    color: #2c3e50;
+    font-weight: 500;
+    min-width: 80px;
+}
+
+.step-btn {
+    background: white;
+    border: 1px solid #ddd;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.step-btn:hover {
+    background: #f0f0f0;
+    border-color: #999;
+}
+
+#genInput {
+    width: 100px;
+    text-align: center;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+}
+
+.gen-info {
+    font-size: 14px;
+    color: #7f8c8d;
+    font-weight: 500;
+    min-width: 60px;
+}
+
+/* Stats Container */
+.stats-container {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #7f8c8d;
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    font-size: 20px;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.graph-container {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+#miniGraph {
+    width: 100%;
+    height: 100px;
+}
+
+/* Experiment View */
+.experiment-view {
+    animation: fadeIn 0.3s;
+}
+
+.results-panel {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 24px;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.results-header h3 {
+    font-size: 18px;
+    color: #2c3e50;
+}
+
+.run-info {
+    font-size: 14px;
+    color: #7f8c8d;
+    background: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+}
+
+.progress-bar {
+    background: #ecf0f1;
+    height: 8px;
+    border-radius: 4px;
+    margin: 16px 0;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #27ae60;
+    width: 0%;
+    transition: width 0.3s;
+}
+
+.results-table-container {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 20px 0;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.results-table th {
+    text-align: left;
+    padding: 12px;
+    background: #ecf0f1;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.results-table td {
+    padding: 12px;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.action-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+}
+
+/* Add to your existing CSS */
+.gen-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    width: 100%;
+}
+
+.gen-label {
+    font-size: 14px;
+    color: #2c3e50;
+    font-weight: 500;
+    min-width: 80px;
+}
+
+#genSlider {
+    flex: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    background: #ecf0f1;
+    border-radius: 4px;
+    outline: none;
+}
+
+#genSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #3498db;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+#genSlider::-webkit-slider-thumb:hover {
+    background: #2980b9;
+}
+
+#genSlider:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#genSlider:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+}
+
+#genDisplay {
+    font-weight: bold;
+    color: #2c3e50;
+    min-width: 60px;
+    text-align: right;
+}
+
+/* Make graphs BIGGER and more prominent */
+.graph-container {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 16px;
+}
+
+/* ONE GRAPH PER ROW - FULL WIDTH */
+.graph-row {
+  display: block;              /* ← CHANGED: stacked vertically */
+  margin-top: 16px;
+}
+
+.graph-item {
+  width: 100%;                 /* ← CHANGED: full width */
+  margin-bottom: 24px;         /* Space between graphs */
+  background: #fafbfc;
+  border: 1px solid #e1e5e9;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.graph-label {
+  text-align: center;
+  font-size: 14px;             /* ← BIGGER text */
+  color: #2c3e50;
+  margin-bottom: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* EVEN BIGGER canvases */
+#coverageGraph, #areaGraph, #diversityGraph {
+  width: 100%;
+  height: 220px !important;    /* ← TALLER: 220px */
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Ensure stats container has enough vertical space */
+.stats-container {
+  min-height: 850px;           /* ← MORE space for 3 big graphs */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Mobile: keep stacked */
+@media (max-width: 768px) {
+  .graph-item {
+    margin-bottom: 20px;
+  }
+}
+
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .config-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

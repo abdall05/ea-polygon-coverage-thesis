@@ -1,0 +1,22 @@
+{
+  "name": "ea-polygon-coverage",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "test.js",
+  "scripts": {
+    "dev": "vite --port 3000",
+    "build": "vite build",
+    "preview": "vite preview --port 3000"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@turf/boolean-point-in-polygon": "^7.3.4",
+    "@turf/helpers": "^7.3.4"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  }
+}

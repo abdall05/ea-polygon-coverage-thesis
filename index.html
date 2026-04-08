@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evolutionary Polygon Coverage</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Evolutionary Polygon Coverage</h1>
+            <p>Interactive platform for 2D point set coverage with polygonal shapes</p>
+        </div>
+
+        <!-- Configuration Panel -->
+        <div class="config-panel">
+            <h2>Configuration</h2>
+
+            <div class="config-grid">
+                <!-- Point Set -->
+                <div class="config-section">
+                    <h3>Point Set</h3>
+                    <div class="param-row">
+                        <label>Distribution:</label>
+                        <select id="pointSet" class="full-width">
+                            <option value="uniform">Uniform Distribution</option>
+                            <option value="clustered">Clustered</option>
+                            <option value="mixed">Mixed</option>
+                        </select>
+                    </div>
+                    <div class="param-row">
+                        <label>Number of Points:</label>
+                        <input type="number" id="pointCount" min="10" max="500" value="100" step="10">
+                    </div>
+                    <div class="param-row" style="margin-top: 10px;">
+                        <button id="generatePointsBtn" class="button secondary"
+                            style="width: 100%; background: #27ae60; color: white;">GENERATE POINTS</button>
+                    </div>
+                </div>
+                <!-- Representation -->
+                <div class="config-section">
+                    <h3>Representation</h3>
+                    <div class="radio-group">
+                        <label><input type="radio" name="rep" value="cartesian" checked> Cartesian</label>
+                        <label><input type="radio" name="rep" value="polar"> Polar</label>
+                    </div>
+                </div>
+
+                <!-- Mutation -->
+                <div class="config-section">
+                    <h3>Mutation</h3>
+                    <select id="mutationType" class="full-width">
+                        <option value="GaussianMutation">Gaussian</option>
+                        <option value="CauchyMutation">Cauchy</option>
+                    </select>
+                    <div id="mutationParams" class="params-container">
+                        <div class="param-row">
+                            <label>Rate:</label>
+                            <input type="number" id="mutationRate" min="0" max="1" step="0.01" value="0.1">
+                        </div>
+                        <div class="param-row">
+                            <label>Step Size:</label>
+                            <input type="number" id="stepSize" min="0" max="1" step="0.01" value="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Crossover -->
+                <div class="config-section">
+                    <h3>Crossover</h3>
+                    <select id="crossoverType" class="full-width">
+                        <option value="none">None</option>
+                        <option value="UniformCrossover">Uniform</option>
+                    </select>
+                    <div id="crossoverParams" class="params-container">
+                        <div class="param-row">
+                            <label>Rate:</label>
+                            <input type="number" id="crossoverRate" min="0" max="1" step="0.01" value="0.8">
+                        </div>
+                        <div class="param-row">
+                            <label>Swap Rate:</label>
+                            <input type="number" id="geneSwapRate" min="0" max="1" step="0.01" value="0.5">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EA Parameters -->
+                <div class="config-section">
+                    <h3>EA Parameters</h3>
+                    <div class="param-row">
+                        <label>Population:</label>
+                        <input type="number" id="popSize" min="10" max="200" value="100">
+                    </div>
+                    <div class="param-row">
+                        <label>Generations:</label>
+                        <input type="number" id="genCount" min="10" max="500" value="150">
+                    </div>
+                    <div class="param-row">
+                        <label>Tournament Size:</label>
+                        <input type="number" id="tournamentSize" min="2" max="10" value="2">
+                    </div>
+                    <div class="param-row">
+                        <label>Elitism:</label>
+                        <input type="number" id="elitismCount" min="0" max="10" value="2">
+                    </div>
+                    <div class="param-row">
+                        <label>N Vertices:</label>
+                        <input type="number" id="nVertices" min="3" max="12" value="7">
+                    </div>
+                </div>
+
+                <!-- Interactive Section -->
+                <div class="config-section">
+                    <h3>Interactive</h3>
+                    <div class="param-row">
+                        <p style="color:#7f8c8d; margin-bottom:10px;">Run evolution with current settings and explore
+                            results generation by generation.</p>
+                    </div>
+                    <div class="param-row" style="gap: 10px;">
+                        <button class="button primary" id="runInteractiveBtn" style="flex: 2;">RUN INTERACTIVE</button>
+                        <button class="button" id="clearBtn" style="flex: 1; background: #95a5a6; color: white;"
+                            disabled>CLEAR</button>
+                    </div>
+                </div>
+
+                <!-- Experiment Settings -->
+                <div class="config-section">
+                    <h3>Experiment</h3>
+                    <div class="param-row">
+                        <label>Experiment Type:</label>
+                        <select id="experimentType" class="full-width">
+                            <option value="general">General</option>
+                            <option value="repComparison">Part A: Representation Comparison</option>
+                            <option value="mutationComparison">Part B: Mutation Comparison</option>
+                            <option value="crossoverComparison">Part C: Crossover Comparison</option>
+                        </select>
+                    </div>
+                    <div class="param-row">
+                        <label>Number of Runs:</label>
+                        <input type="number" id="numRuns" value="30" min="1" max="100">
+                    </div>
+                    <div class="param-row">
+                        <label>Random Seed:</label>
+                        <input type="number" id="experimentSeed" value="42" min="1" max="9999">
+                    </div>
+                    <div class="param-row">
+                        <small style="color:#7f8c8d;">Same seed = same results (for experiments)</small>
+                    </div>
+                    <div id="comparisonOptions" class="comparison-options"></div>
+                    <div class="param-row" style="margin-top: 15px; gap: 10px;">
+                        <button class="button secondary" id="runExperimentBtn" style="flex: 2;">
+                            RUN EXPERIMENT
+                        </button>
+                        <button class="button" id="clearExperimentBtn"
+                            style="flex: 1; background: #95a5a6; color: white;">
+                            CLEAR
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div class="results-container" id="resultsContainer">
+            <div class="empty-state">
+                <p>Configure settings and click RUN INTERACTIVE or RUN EXPERIMENT</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+
+</html>
