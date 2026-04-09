@@ -168,42 +168,42 @@ const UI = {
         const hasPoints = points !== null && points.length > 0;
 
         return `
-        <div class="initial-view">
-            <div class="visualization-area">
-                <div class="canvas-container">
-                    <canvas id="mainCanvas" width="700" height="700"></canvas>
-                </div>
-            </div>
-
-            <div class="stats-container">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Points</div>
-                        <div class="stat-value" id="pointCount">${hasPoints ? points.length : Model.pointCount}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Distribution</div>
-                        <div class="stat-value" id="distribution">${Model.pointSet}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Vertices</div>
-                        <div class="stat-value" id="vertices">${Model.nVertices}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Status</div>
-                        <div class="stat-value" id="status" style="color: ${hasPoints ? '#27ae60' : '#7f8c8d'}">
-                            ${hasPoints ? 'Points Ready' : 'Idle'}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="action-row" style="margin-top: 20px; text-align: center;">
-                    <p style="color: #7f8c8d;">
-                        Configure settings, then choose Interactive or Experiment mode.
-                    </p>
-                </div>
+    <div class="initial-view">
+        <div class="visualization-area">
+            <div class="canvas-container">
+                <canvas id="mainCanvas" width="700" height="700"></canvas>
             </div>
         </div>
+
+        <div class="stats-container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Points</div>
+                    <div class="stat-value" id="pointCount">${hasPoints ? points.length : Model.pointCount}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Distribution</div>
+                    <div class="stat-value" id="distribution">${Model.pointSet}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Vertices</div>
+                    <div class="stat-value" id="vertices">${Model.nVertices}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value" id="status" style="color: ${hasPoints ? '#27ae60' : '#7f8c8d'}">
+                        ${hasPoints ? 'Points Ready' : 'Idle'}
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-row" style="margin-top: 20px; text-align: center;">
+                <p style="color: #7f8c8d;">
+                    ${hasPoints ? 'Points loaded. Click RUN INTERACTIVE to start evolution.' : 'Configure settings, then click GENERATE POINTS.'}
+                </p>
+            </div>
+        </div>
+    </div>
     `;
     },
     bindPointSet() {
@@ -703,7 +703,6 @@ const UI = {
         currentGen = 0;
         bestSolution = null;
         experimentResults = [];
-        points = null;
 
         this.setSettingsEnabled(true);
         this.resetExperimentButton();

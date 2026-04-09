@@ -198,7 +198,7 @@ export class EvolutionEngine {
   repairOffspring(child) {
     if (!this.config.repair) return null;
 
-    const r = child.repair({ fixOrder: true, clamp: true });
+    const r = child.repair({ fixOrder: false, clamp: true });
 
     this.stats.gen.clampFracSum += r.clampFrac;
     if (r.clampAny) this.stats.gen.offspringClampAnyCount += 1;

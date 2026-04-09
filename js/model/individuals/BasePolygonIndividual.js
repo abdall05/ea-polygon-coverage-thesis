@@ -8,11 +8,11 @@ export class BasePolygonIndividual {
     this.N = N;
     this.rng = rng || Math;   // optional RNG
     // Call the abstract method in constructor!
-    this.genome = this.generateGenome(N);
+    this.genome = this.generateGenome();
   }
 
   // Abstract method - subclasses MUST implement
-  generateGenome(N) {
+  generateGenome() {
     throw new Error("generateGenome() must be implemented by subclass");
   }
 
@@ -25,7 +25,7 @@ export class BasePolygonIndividual {
   }
 
   // Repair - can be overridden, but base provides default structure
-  repair(options = { fixOrder: true, clamp: true }) {
+  repair(options = { fixOrder: false, clamp: true }) {
     const result = {
       orderChanged: false,   // fixOrder() changed genome order this call
       clampFrac: 0,          // fraction of clampable genes clamped this call

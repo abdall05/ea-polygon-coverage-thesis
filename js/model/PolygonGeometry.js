@@ -2,6 +2,7 @@
 import { point, polygon } from '@turf/helpers';
 import { booleanPointInPolygon } from '@turf/boolean-point-in-polygon';
 import { GEOMETRY_CONFIG } from "./config.js";
+import { clamp, wrapTo2Pi } from '../utils/math.js';
 
 
 export class PolygonGeometry {
@@ -108,61 +109,32 @@ export class PolygonGeometry {
     }
 
 
-    // CLAMPING FUNCTIONS - ensure points/params stay within bounds
-    static clamp(v, lo, hi, counter) {
-        const clamped = Math.min(Math.max(v, lo), hi);
-        if (counter && clamped !== v) counter.changed++;
-        return clamped;
-    }
 
-    static clampCartesianPoints(points) {
-        const min = GEOMETRY_CONFIG.WORLD_MIN;
-        const max = GEOMETRY_CONFIG.WORLD_MAX;
-
-        const counter = { changed: 0 };
-
-        const clampedPoints = points.map(p => ({
-            x: PolygonGeometry.clamp(p.x, min, max, counter),
-            y: PolygonGeometry.clamp(p.y, min, max, counter),
+    static clampCartesianPoints(points, min = 0, max = 1) {
+        return points.map(p => ({
+            x: clamp(p.x, min, max),
+            y: clamp(p.y, min, max)
         }));
-
-        return { clampedPoints, numClampedValues: counter.changed };
     }
 
-    static wrapTo2Pi(angle) {
-        const twoPi = 2 * Math.PI;
-        angle = angle % twoPi;
-        if (angle < 0) angle += twoPi;
-        return angle;
-    }
-    static clampPolarParams(cx, cy, angles, radii) {
-        const min = GEOMETRY_CONFIG.WORLD_MIN;
-        const max = GEOMETRY_CONFIG.WORLD_MAX;
 
-        const counter = { changed: 0 };
+    static clampPolarParams(cx, cy, angles, radii, min = 0, max = 1) {
 
-        cx = PolygonGeometry.clamp(cx, min, max, counter);
-        cy = PolygonGeometry.clamp(cy, min, max, counter);
+        cx = clamp(cx, min, max);
+        cy = clamp(cy, min, max);
 
         const N = angles.length;
         const safeAngles = new Array(N);
         const safeRadii = new Array(N);
 
         for (let i = 0; i < N; i++) {
-            // Normalize angle to [0, 2π)
-            const angle = PolygonGeometry.wrapTo2Pi(angles[i]);
-
-            // If radius is negative, set to 0
-            let oldR = radii[i];
-            let newR = oldR < 0 ? 0 : oldR;
-
-            if (newR !== oldR) counter.changed++;
 
             // Clamp radius to max allowed in this direction
-            let rMax = PolygonGeometry.maxRadiusInDirection(cx, cy, angle);
-            newR = Math.min(newR, rMax);
-
-            if (newR !== oldR && oldR >= 0) counter.changed++;
+            const angle = angles[i]
+            const radius = radii[i]
+            const effectiveAngle = radius < 0 ? angle + Math.PI : angle;
+            let rMax = PolygonGeometry.maxRadiusInDirection(cx, cy, effectiveAngle);
+            let newR = clamp(radius, -rMax, rMax);
 
             safeAngles[i] = angle;
             safeRadii[i] = newR;  // Always >= 0
@@ -173,42 +145,25 @@ export class PolygonGeometry {
             cy,
             angles: safeAngles,
             radii: safeRadii,
-            numClampedValues: counter.changed
         };
     }    // PolygonGeometry.js - CLEAN version
     static fixPolygonOrder(points) {
-        if (points.length < 3) return { points, changed: false };
+        if (points.length < 3) return points;
 
-        // 1. Deterministic pre‑sort by x, then y
-        const canonical = [...points].sort((a, b) =>
-            a.x !== b.x ? a.x - b.x : a.y - b.y
-        );
-
-        // 2. Compute centroid
-        const center = canonical.reduce((acc, p) => {
+        // Compute centroid
+        const center = points.reduce((acc, p) => {
             acc.x += p.x; acc.y += p.y;
             return acc;
         }, { x: 0, y: 0 });
-        center.x /= canonical.length;
-        center.y /= canonical.length;
+        center.x /= points.length;
+        center.y /= points.length;
 
-        // 3. Stable sort by angle (preserves pre‑sort order for equal angles)
-        const sorted = canonical.sort((a, b) => {
+        // Sort by angle around centroid
+        return [...points].sort((a, b) => {
             const angleA = Math.atan2(a.y - center.y, a.x - center.x);
             const angleB = Math.atan2(b.y - center.y, b.x - center.x);
             return angleA - angleB;
         });
-
-        // Check if changed (same as before)
-        let changed = false;
-        for (let i = 0; i < points.length; i++) {
-            if (sorted[i].x !== points[i].x || sorted[i].y !== points[i].y) {
-                changed = true;
-                break;
-            }
-        }
-        return { points: sorted, changed };
     }
-
 
 }
