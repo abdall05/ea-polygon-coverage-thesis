@@ -72,20 +72,15 @@
                 <!-- Crossover -->
                 <div class="config-section">
                     <h3>Crossover</h3>
-                    <select id="crossoverType" class="full-width">
-                        <option value="none">None</option>
-                        <option value="UniformCrossover">Uniform</option>
-                    </select>
-                    <div id="crossoverParams" class="params-container">
-                        <div class="param-row">
-                            <label>Rate:</label>
-                            <input type="number" id="crossoverRate" min="0" max="1" step="0.01" value="0.8">
-                        </div>
-                        <div class="param-row">
-                            <label>Swap Rate:</label>
-                            <input type="number" id="geneSwapRate" min="0" max="1" step="0.01" value="0.5">
-                        </div>
+                    <div class="param-row">
+                        <label>Crossover Type:</label>
+                        <select id="crossoverType" class="full-width">
+                            <option value="none">None</option>
+                            <option value="SBXCrossover">SBX</option>
+                            <option value="BLXAlphaCrossover">BLX-α</option>
+                        </select>
                     </div>
+                    <div id="crossoverParams" class="params-container"></div>
                 </div>
 
                 <!-- EA Parameters -->
@@ -127,30 +122,26 @@
                     </div>
                 </div>
 
-                <!-- Experiment Settings -->
+                <!-- Experiment -->
                 <div class="config-section">
                     <h3>Experiment</h3>
-                    <div class="param-row">
-                        <label>Experiment Type:</label>
-                        <select id="experimentType" class="full-width">
-                            <option value="general">General</option>
-                            <option value="repComparison">Part A: Representation Comparison</option>
-                            <option value="mutationComparison">Part B: Mutation Comparison</option>
-                            <option value="crossoverComparison">Part C: Crossover Comparison</option>
-                        </select>
-                    </div>
+
                     <div class="param-row">
                         <label>Number of Runs:</label>
                         <input type="number" id="numRuns" value="30" min="1" max="100">
                     </div>
+
                     <div class="param-row">
                         <label>Random Seed:</label>
                         <input type="number" id="experimentSeed" value="42" min="1" max="9999">
                     </div>
+
                     <div class="param-row">
-                        <small style="color:#7f8c8d;">Same seed = same results (for experiments)</small>
+                        <small style="color:#7f8c8d;">
+                            Repeats the currently selected configuration and exports measurements for external analysis.
+                        </small>
                     </div>
-                    <div id="comparisonOptions" class="comparison-options"></div>
+
                     <div class="param-row" style="margin-top: 15px; gap: 10px;">
                         <button class="button secondary" id="runExperimentBtn" style="flex: 2;">
                             RUN EXPERIMENT

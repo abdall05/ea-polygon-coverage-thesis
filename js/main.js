@@ -44,10 +44,10 @@ const Model = {
         type: 'none',
         params: {
             none: {},
-            UniformCrossover: { rate: 0.8, swapRate: 0.5 }
+            SBXCrossover: { crossoverRate: 0.8, distributionIndex: 5 },
+            BLXAlphaCrossover: { crossoverRate: 0.8, alpha: 0.5 }
         }
     },
-
     // EA Parameters
     popSize: 100,
     genCount: 150,
@@ -57,7 +57,6 @@ const Model = {
 
     // Experiment
     experiment: {
-        type: 'general',
         numRuns: 30
     },
 
@@ -127,9 +126,9 @@ const UI = {
         const controls = [
             '#pointSet', '#pointCount', '#generatePointsBtn',
             'input[name="rep"]', '#mutationType', '#mutationRate', '#stepSize',
-            '#crossoverType', '#crossoverRate', '#geneSwapRate',
+            '#crossoverType', '#crossoverRate', '#distributionIndex', '#alpha',
             '#popSize', '#genCount', '#tournamentSize', '#elitismCount', '#nVertices',
-            '#experimentType', '#numRuns', '#experimentSeed'
+            '#numRuns', '#experimentSeed'
         ];
 
         controls.forEach(selector => {
@@ -339,19 +338,29 @@ const UI = {
         const params = Model.crossover.params[type];
 
         let html = '';
-        if (type === 'UniformCrossover') {
+
+        if (type === 'SBXCrossover') {
             html = `
-                <div class="param-row">
-                    <label>Rate:</label>
-                    <input type="number" id="crossoverRate" min="0" max="1" step="0.01" value="${params.rate}">
-                </div>
-                <div class="param-row">
-                    <label>Swap Rate:</label>
-                    <input type="number" id="geneSwapRate" min="0" max="1" step="0.01" value="${params.swapRate}">
-                </div>
-            `;
-        } else {
-            html = '';
+            <div class="param-row">
+                <label>Rate:</label>
+                <input type="number" id="crossoverRate" min="0" max="1" step="0.01" value="${params.crossoverRate}">
+            </div>
+            <div class="param-row">
+                <label>Distribution Index:</label>
+                <input type="number" id="distributionIndex" min="1" max="50" step="1" value="${params.distributionIndex}">
+            </div>
+        `;
+        } else if (type === 'BLXAlphaCrossover') {
+            html = `
+            <div class="param-row">
+                <label>Rate:</label>
+                <input type="number" id="crossoverRate" min="0" max="1" step="0.01" value="${params.crossoverRate}">
+            </div>
+            <div class="param-row">
+                <label>Alpha:</label>
+                <input type="number" id="alpha" min="0" max="2" step="0.1" value="${params.alpha}">
+            </div>
+        `;
         }
 
         container.innerHTML = html;
@@ -361,12 +370,21 @@ const UI = {
     bindCrossoverParams() {
         const type = Model.crossover.type;
 
-        if (type === 'UniformCrossover') {
+        if (type === 'SBXCrossover') {
             document.getElementById('crossoverRate')?.addEventListener('input', (e) => {
-                Model.crossover.params.UniformCrossover.rate = parseFloat(e.target.value) || 0.8;
+                Model.crossover.params.SBXCrossover.crossoverRate = parseFloat(e.target.value) || 0.8;
             });
-            document.getElementById('geneSwapRate')?.addEventListener('input', (e) => {
-                Model.crossover.params.UniformCrossover.swapRate = parseFloat(e.target.value) || 0.5;
+
+            document.getElementById('distributionIndex')?.addEventListener('input', (e) => {
+                Model.crossover.params.SBXCrossover.distributionIndex = parseInt(e.target.value) || 5;
+            });
+        } else if (type === 'BLXAlphaCrossover') {
+            document.getElementById('crossoverRate')?.addEventListener('input', (e) => {
+                Model.crossover.params.BLXAlphaCrossover.crossoverRate = parseFloat(e.target.value) || 0.8;
+            });
+
+            document.getElementById('alpha')?.addEventListener('input', (e) => {
+                Model.crossover.params.BLXAlphaCrossover.alpha = parseFloat(e.target.value) || 0.5;
             });
         }
     },
@@ -408,18 +426,11 @@ const UI = {
     },
 
     bindExperiment() {
-        const typeSelect = document.getElementById('experimentType');
         const numRuns = document.getElementById('numRuns');
         const seedInput = document.getElementById('experimentSeed');
 
-        if (typeSelect) typeSelect.value = Model.experiment.type;
         if (numRuns) numRuns.value = Model.experiment.numRuns;
         if (seedInput) seedInput.value = Model.experimentSeed;
-
-        typeSelect?.addEventListener('change', (e) => {
-            Model.update('experiment.type', e.target.value);
-            this.updateComparisonOptions();
-        });
 
         numRuns?.addEventListener('input', (e) => {
             Model.update('experiment.numRuns', parseInt(e.target.value) || 30);
@@ -430,46 +441,7 @@ const UI = {
         });
     },
 
-    updateComparisonOptions() {
-        const container = document.getElementById('comparisonOptions');
-        if (!container) return;
 
-        const type = Model.experiment.type;
-
-        let html = '';
-        if (type === 'repComparison') {
-            html = `
-                <div class="param-row">
-                    <label>Compare:</label>
-                    <select id="repCompareSelect" class="full-width">
-                        <option value="both">Cartesian vs Polar</option>
-                    </select>
-                </div>
-            `;
-        } else if (type === 'mutationComparison') {
-            html = `
-        <div class="param-row">
-            <label>Compare:</label>
-            <select id="mutationCompareSelect" class="full-width">
-                <option value="all">Gaussian vs Cauchy</option>
-            </select>
-        </div>
-    `;
-        } else if (type === 'crossoverComparison') {
-            html = `
-                <div class="param-row">
-                    <label>Compare:</label>
-                    <select id="crossoverCompareSelect" class="full-width">
-                        <option value="all">None vs Uniform</option>
-                    </select>
-                </div>
-            `;
-        } else {
-            html = '<div class="param-row"><small>No comparison options</small></div>';
-        }
-
-        container.innerHTML = html;
-    },
 
     bindButtons() {
         const runBtn = document.getElementById('runInteractiveBtn');
@@ -1856,29 +1828,46 @@ const UI = {
 
                 const result = evolutionEngine.run(IndividualClass, Model.nVertices);
                 const finalGen = result.history[result.history.length - 1];
-
                 const runData = {
                     run: runIndex + 1,
-                    condition: conditionLabel,
+
                     pointSet: Model.pointSet,
                     pointCount: Model.pointCount,
                     representation: Model.representation,
+
                     mutationType: Model.mutation.type,
+                    mutationRate: Model.mutation.params[Model.mutation.type]?.mutationRate ?? null,
+                    mutationStepSize: Model.mutation.params[Model.mutation.type]?.stepSize ?? null,
+
                     crossoverType: Model.crossover.type,
-                    seeds: {
-                        points: Model.experimentSeed + 1000,
-                        mutation: Model.experimentSeed + runIndex * 10000 + 2000,
-                        crossover: Model.experimentSeed + runIndex * 10000 + 3000,
-                        selection: Model.experimentSeed + runIndex * 10000 + 4000,
-                        initialization: Model.experimentSeed + runIndex * 10000 + 5000
-                    },
+                    crossoverRate: Model.crossover.params[Model.crossover.type]?.crossoverRate ?? null,
+                    crossoverDistributionIndex: Model.crossover.type === 'SBXCrossover'
+                        ? Model.crossover.params.SBXCrossover.distributionIndex
+                        : null,
+                    crossoverAlpha: Model.crossover.type === 'BLXAlphaCrossover'
+                        ? Model.crossover.params.BLXAlphaCrossover.alpha
+                        : null,
+
+                    popSize: Model.popSize,
+                    genCount: Model.genCount,
+                    tournamentSize: Model.tournamentSize,
+                    elitismCount: Model.elitismCount,
+                    nVertices: Model.nVertices,
+
+                    experimentSeed: Model.experimentSeed,
+
+                    seedPoints: Model.experimentSeed + 1000,
+                    seedMutation: Model.experimentSeed + runIndex * 10000 + 2000,
+                    seedCrossover: Model.experimentSeed + runIndex * 10000 + 3000,
+                    seedSelection: Model.experimentSeed + runIndex * 10000 + 4000,
+                    seedInitialization: Model.experimentSeed + runIndex * 10000 + 5000,
+
                     points: runIndex === 0 ? JSON.parse(JSON.stringify(points)) : null,
                     history: result.history,
-                    final: {
-                        coverage: finalGen.bestFitness.coverage,
-                        area: finalGen.bestFitness.area,
-                        diversity: finalGen.diversity
-                    }
+
+                    finalCoverage: finalGen.bestFitness.coverage,
+                    finalArea: finalGen.bestFitness.area,
+                    finalDiversity: finalGen.diversity
                 };
 
                 experimentResults.push(runData);
