@@ -1,15 +1,20 @@
 import { BaseCrossover } from './BaseCrossover.js';
+import { CROSSOVER_TYPES } from './crossoverConfig.js';
 
 export class SBXCrossover extends BaseCrossover {
-  type = 'SBXCrossover';
-
-  constructor(params = {}, rng = null) {
-    super({ distributionIndex: 5, ...params }, rng);
-  }
+  type = CROSSOVER_TYPES.SBX;
 
   crossoverGenomes(c1, c2) {
     const eta = this.params.distributionIndex;
     const eps = 1e-14;
+
+    if (!Number.isFinite(eta) || eta <= 0) {
+      throw new Error(`${this.type} requires a positive finite distributionIndex`);
+    }
+
+    if (c1.genome.length !== c2.genome.length) {
+      throw new Error(`${this.type}: genome lengths differ`);
+    }
 
     for (let i = 0; i < c1.genome.length; i++) {
       const x1 = c1.genome[i];

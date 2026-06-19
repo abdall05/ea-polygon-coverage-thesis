@@ -1,20 +1,31 @@
-
 import { BasePolygonIndividual } from './BasePolygonIndividual.js';
-import { PolygonGeometry } from '../PolygonGeometry.js';
+import { INDIVIDUAL_TYPES } from './individualConfig.js';
+import { PolygonGeometry } from '../geometry/PolygonGeometry.js';
+
 export class CartesianPolygonIndividual extends BasePolygonIndividual {
-  type = 'cartesian';
+  constructor(N, rng = null) {
+    super(INDIVIDUAL_TYPES.CARTESIAN, N, rng);
+    this.genome = this.generateGenome();
+  }
 
   generateGenome() {
-    const points = PolygonGeometry.generateRandomPolygon(this.N, 'cartesian', this.rng);
+    const points = PolygonGeometry.generateRandomPolygon(
+      this.N,
+      this.type,
+      this.rng
+    );
+
     const genome = [];
     for (const p of points) {
       genome.push(p.x, p.y);
     }
+
     return genome;
   }
 
   decodePolygon() {
     const rawPoints = [];
+
     for (let i = 0; i < this.genome.length; i += 2) {
       rawPoints.push({
         x: this.genome[i],
@@ -24,53 +35,46 @@ export class CartesianPolygonIndividual extends BasePolygonIndividual {
 
     return PolygonGeometry.fixPolygonOrder(rawPoints);
   }
-  
+
   clone() {
-    // Create empty individual WITHOUT generating random genome
     const copy = Object.create(CartesianPolygonIndividual.prototype);
     copy.N = this.N;
-    copy.clampableGenes = this.clampableGenes;
     copy.type = this.type;
+    copy.rng = this.rng;
     copy.genome = [...this.genome];
     copy.fitness = { ...this.fitness };
+    copy.lineage = this.lineage;
     return copy;
   }
 
-  // Fix vertex order
-  // fixOrder() {
-  //   const points = this.decodePolygon();
-  //   const { points: fixedPoints, changed } = PolygonGeometry.fixPolygonOrder(points);
-
-  //   if (changed) {
-  //     for (let i = 0; i < fixedPoints.length; i++) {
-  //       this.genome[2 * i] = fixedPoints[i].x;
-  //       this.genome[2 * i + 1] = fixedPoints[i].y;
-  //     }
-  //   }
-
-  //   return changed;
-  // }
-
-  // Clamp points to bounding box and return clamp rate for this individual
   clampGenome() {
-    const oldPoints = this.decodePolygon();
-    const newPoints = PolygonGeometry.clampCartesianPoints(oldPoints);
+    const rawPoints = [];
 
-    // Count changes HERE (genome responsibility)
-    let changedCount = 0;
-    for (let i = 0; i < this.N; i++) {
-      if (oldPoints[i].x !== newPoints[i].x) changedCount++;
-      if (oldPoints[i].y !== newPoints[i].y) changedCount++;
+    for (let i = 0; i < this.genome.length; i += 2) {
+      rawPoints.push({
+        x: this.genome[i],
+        y: this.genome[i + 1]
+      });
     }
 
-    // Write to genome
-    for (let i = 0; i < newPoints.length; i++) {
-      this.genome[2 * i] = newPoints[i].x;
-      this.genome[2 * i + 1] = newPoints[i].y;
-    }
+    const clampedPoints = PolygonGeometry.clampCartesianPoints(rawPoints);
 
-    const clampableGenes = 2 * this.N;
-    return changedCount / clampableGenes;
+    for (let i = 0; i < clampedPoints.length; i++) {
+      this.genome[2 * i] = clampedPoints[i].x;
+      this.genome[2 * i + 1] = clampedPoints[i].y;
+    }
   }
 
+  normalizedGenotypeDistance(other) {
+    if (!other || !other.genome || other.genome.length !== this.genome.length) {
+      return 0;
+    }
+
+    let sum = 0;
+    for (let i = 0; i < this.genome.length; i++) {
+      sum += Math.abs(this.genome[i] - other.genome[i]);
+    }
+
+    return sum / this.genome.length;
+  }
 }

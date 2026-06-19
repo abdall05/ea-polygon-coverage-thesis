@@ -1,24 +1,36 @@
-// selection/TournamentSelection.js
-export class TournamentSelection {
+import { Selection } from "./Selection.js";
+import { SELECTION_TYPES } from "./selectionConfig.js";
+
+export class TournamentSelection extends Selection {
+  type = SELECTION_TYPES.TOURNAMENT;
+
   constructor(params = {}, rng = null) {
-    this.params = {
-      tournamentSize: 2,
-      ...params
-    };
-    this.type = "TournamentSelection";
-     this.rng = rng || Math;
+    super(params, rng);
+
+    const tournamentSize = this.params.tournamentSize;
+    if (!Number.isInteger(tournamentSize) || tournamentSize < 2) {
+      throw new Error(`${this.type} requires a valid integer tournamentSize >= 2`);
+    }
+
+    this.tournamentSize = tournamentSize;
   }
 
   select(population, compareFitness) {
+    if (!Array.isArray(population) || population.length === 0) {
+      throw new Error(`${this.type} requires a non-empty population`);
+    }
+
     let best = null;
-    const k = this.params.tournamentSize;
-    
-    for (let i = 0; i < k; i++) {
-      const cand = population[Math.floor(this.rng.random() * population.length)];
-      if (best === null || compareFitness(cand.fitness, best.fitness) < 0) {
-        best = cand;
+
+    for (let i = 0; i < this.tournamentSize; i++) {
+      const idx = Math.floor(this.rng.random() * population.length);
+      const candidate = population[idx];
+
+      if (best === null || compareFitness(candidate.fitness, best.fitness) < 0) {
+        best = candidate;
       }
     }
+
     return best;
   }
 }

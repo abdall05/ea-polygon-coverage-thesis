@@ -1,25 +1,28 @@
-import { BaseCrossover } from "./BaseCrossover.js";
+import { BaseCrossover } from './BaseCrossover.js';
+import { CROSSOVER_TYPES } from './crossoverConfig.js';
 
 export class UniformCrossover extends BaseCrossover {
-    type = "UniformCrossover";
-    constructor(params = {}, rng = null) {
-        super({ geneSwapRate: 0.5, ...params });
+  type = CROSSOVER_TYPES.UNIFORM;
+
+  crossoverGenomes(child1, child2) {
+    const g1 = child1.genome;
+    const g2 = child2.genome;
+    const geneSwapRate = this.params.geneSwapRate;
+
+    if (g1.length !== g2.length) {
+      throw new Error(`${this.type}: genome lengths differ`);
     }
 
-    crossoverGenomes(child1, child2) {
-        const g1 = child1.genome;
-        const g2 = child2.genome;
-
-        if (g1.length !== g2.length) {
-            throw new Error("UniformCrossover: genome lengths differ");
-        }
-
-        for (let i = 0; i < g1.length; i++) {
-            if (this.rng.random() < this.params.geneSwapRate) {
-                const tmp = g1[i];
-                g1[i] = g2[i];
-                g2[i] = tmp;
-            }
-        }
+    if (!Number.isFinite(geneSwapRate) || geneSwapRate < 0 || geneSwapRate > 1) {
+      throw new Error(`${this.type} requires geneSwapRate in [0, 1]`);
     }
+
+    for (let i = 0; i < g1.length; i++) {
+      if (this.rng.random() < geneSwapRate) {
+        const tmp = g1[i];
+        g1[i] = g2[i];
+        g2[i] = tmp;
+      }
+    }
+  }
 }

@@ -13,8 +13,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@stdlib/stats-kruskal-test": "^0.2.3",
+    "@stdlib/stats-padjust": "^0.2.3",
+    "@tainakanchu/mann-whitney-utest": "^1.1.0",
     "@turf/boolean-point-in-polygon": "^7.3.4",
-    "@turf/helpers": "^7.3.4"
+    "@turf/helpers": "^7.3.4",
+    "plotly.js-dist-min": "^3.5.0"
   },
   "devDependencies": {
     "vite": "^7.3.1"

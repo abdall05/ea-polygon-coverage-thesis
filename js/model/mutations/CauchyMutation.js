@@ -1,40 +1,79 @@
 import { BaseMutation } from './BaseMutation.js';
+import { MUTATION_TYPES } from './mutationConfig.js';
 
 export class CauchyMutation extends BaseMutation {
-  type = "CauchyMutation";
-
   constructor(params = {}, rng = null) {
-    super({ stepSize: 0.1, ...params }, rng);
+    super(MUTATION_TYPES.CAUCHY, params, rng);
   }
-
   cauchyRandom(location, scale, rng) {
     let u = 0;
     while (u === 0 || u === 1) u = rng.random();
     return location + scale * Math.tan(Math.PI * (u - 0.5));
   }
 
-  applyCartesian(ind) {
+  mutateGene(ind, index, scale) {
+    if (this.rng.random() < this.params.mutationRate) {
+      ind.genome[index] += this.cauchyRandom(0, scale, this.rng);
+    }
+  }
+
+  applyCartesian(ind, context = {}) {
+    const scale = this.params.stepSize;
+
+    if (!Number.isFinite(scale) || scale < 0) {
+      throw new Error(`${this.type} requires a valid non-negative stepSize`);
+    }
+
     for (let i = 0; i < ind.genome.length; i++) {
-      if (this.rng.random() < this.params.mutationRate) {
-        ind.genome[i] += this.cauchyRandom(0, this.params.stepSize, this.rng);
+      this.mutateGene(ind, i, scale);
+    }
+  }
+
+  applyPolarVariableCenter(ind, context = {}) {
+    const centerStepSize = this.params.centerStepSize;
+    const angleStepSize = this.params.angleStepSize;
+    const radiusStepSize = this.params.radiusStepSize;
+
+    if (!Number.isFinite(centerStepSize) || centerStepSize < 0) {
+      throw new Error(`${this.type} requires a valid non-negative centerStepSize`);
+    }
+
+    if (!Number.isFinite(angleStepSize) || angleStepSize < 0) {
+      throw new Error(`${this.type} requires a valid non-negative angleStepSize`);
+    }
+
+    if (!Number.isFinite(radiusStepSize) || radiusStepSize < 0) {
+      throw new Error(`${this.type} requires a valid non-negative radiusStepSize`);
+    }
+
+    for (let i = 0; i < ind.genome.length; i++) {
+      if (i < 2) {
+        this.mutateGene(ind, i, centerStepSize);
+      } else if (i % 2 === 0) {
+        this.mutateGene(ind, i, angleStepSize);
+      } else {
+        this.mutateGene(ind, i, radiusStepSize);
       }
     }
   }
 
-  applyPolar(ind) {
-    const centerStep = this.params.stepSize * 1.0;
-    const angleStep = this.params.stepSize * (2 * Math.PI);
-    const radiusStep = this.params.stepSize * 1.0;
+  applyPolarFixedCenter(ind, context = {}) {
+    const angleStepSize = this.params.angleStepSize;
+    const radiusStepSize = this.params.radiusStepSize;
+
+    if (!Number.isFinite(angleStepSize) || angleStepSize < 0) {
+      throw new Error(`${this.type} requires a valid non-negative angleStepSize`);
+    }
+
+    if (!Number.isFinite(radiusStepSize) || radiusStepSize < 0) {
+      throw new Error(`${this.type} requires a valid non-negative radiusStepSize`);
+    }
 
     for (let i = 0; i < ind.genome.length; i++) {
-      if (this.rng.random() < this.params.mutationRate) {
-        if (i < 2) {
-          ind.genome[i] += this.cauchyRandom(0, centerStep, this.rng);
-        } else if (i % 2 === 0) {
-          ind.genome[i] += this.cauchyRandom(0, angleStep, this.rng);
-        } else {
-          ind.genome[i] += this.cauchyRandom(0, radiusStep, this.rng);
-        }
+      if (i % 2 === 0) {
+        this.mutateGene(ind, i, angleStepSize);
+      } else {
+        this.mutateGene(ind, i, radiusStepSize);
       }
     }
   }

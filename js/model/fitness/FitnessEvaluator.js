@@ -1,5 +1,5 @@
 // FitnessEvaluator.js
-import { PolygonGeometry } from './PolygonGeometry.js';
+import { PolygonGeometry } from '../geometry/PolygonGeometry';
 
 export class FitnessEvaluator {
     constructor(targetPoints) {
@@ -16,11 +16,5 @@ export class FitnessEvaluator {
         return individual.fitness;
     }
 
-    compare(fitnessA, fitnessB) {
-        if (fitnessA.coverage !== fitnessB.coverage) {
-            return fitnessB.coverage - fitnessA.coverage;
-        }
-        return fitnessA.area - fitnessB.area;
-    }
 }
 

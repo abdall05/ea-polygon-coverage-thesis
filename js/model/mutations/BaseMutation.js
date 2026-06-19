@@ -1,32 +1,53 @@
+import { INDIVIDUAL_TYPES } from '../individuals/individualConfig.js';
+
 export class BaseMutation {
-  type = "BaseMutation";
-  constructor(params = {}, rng = null) {
-    if (new.target === BaseMutation) throw new Error("BaseMutation is abstract");
+  constructor(type, params = {}, rng = null) {
+    if (new.target === BaseMutation) {
+      throw new Error('BaseMutation is abstract');
+    }
 
-    this.params = { mutationRate: 0.1, ...params };
-    this.rng = rng || Math;
-  }
+    if (!type) {
+      throw new Error('BaseMutation requires a type');
+    }
 
-  setParams(params) {
-    this.params = { ...this.params, ...params };
-  }
+    this.type = type;
+    this.params = { ...params };
+    this.rng = rng ?? Math;
 
-  // This decides WHICH version to call
-  apply(individual) {
-    if (individual.type === 'cartesian') {
-      this.applyCartesian(individual);
-    } else if (individual.type === 'polar') {
-      this.applyPolar(individual);
-    } else {
-      throw new Error(`Unknown individual type: ${individual.type}`);
+    const mutationRate = this.params.mutationRate;
+    if (!Number.isFinite(mutationRate) || mutationRate < 0 || mutationRate > 1) {
+      throw new Error(`${this.type} requires a valid mutationRate in [0, 1]`);
     }
   }
-  // These MUST be implemented by child classes!
-  applyCartesian(ind) {
-    throw new Error(`${this.type} must implement applyCartesian()`);
+
+  apply(individual, context = {}) {
+    if (individual.type === INDIVIDUAL_TYPES.CARTESIAN) {
+      this.applyCartesian(individual, context);
+      return;
+    }
+
+    if (individual.type === INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER) {
+      this.applyPolarVariableCenter(individual, context);
+      return;
+    }
+
+    if (individual.type === INDIVIDUAL_TYPES.POLAR_FIXED_CENTER) {
+      this.applyPolarFixedCenter(individual, context);
+      return;
+    }
+
+    throw new Error(`Unknown individual type: ${individual.type}`);
   }
 
-  applyPolar(ind) {
-    throw new Error(`${this.type} must implement applyPolar()`);
+  applyCartesian(ind, context = {}) {
+    throw new Error(`${this.type} must implement applyCartesian(ind, context)`);
+  }
+
+  applyPolarVariableCenter(ind, context = {}) {
+    throw new Error(`${this.type} must implement applyPolarVariableCenter(ind, context)`);
+  }
+
+  applyPolarFixedCenter(ind, context = {}) {
+    throw new Error(`${this.type} must implement applyPolarFixedCenter(ind, context)`);
   }
 }
