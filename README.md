@@ -71,7 +71,7 @@ http://localhost:3000
 A static live demo of the platform is available at:
 
 ```text
-https://peppy-duckanoo-660973.netlify.app/
+https://polygon-coverage-ea.netlify.app/
 ```
 
 ## Reproducibility
