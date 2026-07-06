@@ -16,7 +16,7 @@ export const evolutionFieldConfig = Object.freeze({
   elitismCount: Object.freeze({
     label: 'Elitism Count',
     default: 2,
-    min: 0,
+    min: 1,
     step: 1
   })
 });

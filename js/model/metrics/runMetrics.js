@@ -1,193 +1,241 @@
-import { METRIC_DEFINITIONS } from './metricConfig.js';
+import {
+  METRIC_DEFINITIONS,
+  METRIC_KEYS
+} from './metricConfig.js';
 
-const METRIC_KEYS = Object.keys(METRIC_DEFINITIONS);
+function firstIndexWhere(series, predicate) {
+  for (let i = 0; i < series.length; i++) {
+    if (predicate(series[i], i)) return i;
+  }
 
-export function computeRunMetrics(history, cfg) {
-    if (!Array.isArray(history) || history.length === 0) return null;
+  return -1;
+}
 
-    const { maxPossibleCoverage, coverageThreshold } = cfg ?? {};
+export function computeRunMetrics(history, config) {
+  if (!Array.isArray(history) || history.length === 0) return null;
 
-    if (!Number.isFinite(maxPossibleCoverage) || maxPossibleCoverage <= 0) {
-        throw new Error('maxPossibleCoverage must be a positive number');
+  const maxPossibleCoverage = Number(config?.maxPossibleCoverage);
+
+  const thresholdFraction = Number.isFinite(config?.thresholdFraction)
+    ? config.thresholdFraction
+    : 0.95;
+
+  const includeCoverageMetrics = config?.enabledGroups?.coverage !== false;
+  const includeAreaMetrics = config?.enabledGroups?.area !== false;
+  const includeDiversityMetrics = config?.enabledGroups?.diversity !== false;
+
+  const coverageSeries = history.map(generation =>
+    generation?.bestFitness?.coverage ?? 0
+  );
+
+  const areaSeries = history.map(generation =>
+    generation?.bestFitness?.area ?? null
+  );
+
+  const generationCount = coverageSeries.length;
+  const lastGenerationIndex = generationCount - 1;
+
+  // Generations are indexed 0 ... T, so T + 1 means that the event was not reached.
+  const censoredGeneration = lastGenerationIndex + 1;
+
+  const metrics = {};
+
+  const hasValidMaxCoverage =
+    Number.isFinite(maxPossibleCoverage) && maxPossibleCoverage > 0;
+
+  let bestCoverageReached = null;
+  let reachedFullCoverage = null;
+  let firstFullCoverageGeneration = censoredGeneration;
+
+  if ((includeCoverageMetrics || includeAreaMetrics) && hasValidMaxCoverage) {
+    bestCoverageReached = Math.max(...coverageSeries);
+
+    const coverageThreshold = maxPossibleCoverage * thresholdFraction;
+
+    const thresholdIndex = firstIndexWhere(
+      coverageSeries,
+      coverage => coverage >= coverageThreshold
+    );
+
+    const gensToCoverageThreshold =
+      thresholdIndex === -1 ? censoredGeneration : thresholdIndex;
+
+    reachedFullCoverage = bestCoverageReached >= maxPossibleCoverage ? 1 : 0;
+
+    const fullCoverageIndex = firstIndexWhere(
+      coverageSeries,
+      coverage => coverage >= maxPossibleCoverage
+    );
+
+    if (fullCoverageIndex !== -1) {
+      firstFullCoverageGeneration = fullCoverageIndex;
     }
 
-    if (!Number.isFinite(coverageThreshold) || coverageThreshold <= 0 || coverageThreshold > 1) {
-        throw new Error('coverageThreshold must be a number in (0, 1]');
+    if (includeCoverageMetrics) {
+      metrics.bestCoverageReached = bestCoverageReached;
+      metrics.reachedFullCoverage = reachedFullCoverage;
+      metrics.gensToCoverageThreshold = gensToCoverageThreshold;
+      metrics.firstFullCoverageGeneration = firstFullCoverageGeneration;
     }
+  }
 
-    const coverage = history.map(g => g?.bestFitness?.coverage ?? 0);
-    const area = history.map(g => g?.bestFitness?.area ?? 0);
-    const diversity = history.map(g => g?.diversity ?? null);
+  if (includeAreaMetrics) {
+    let areaAtFirstFullCoverage = null;
+    let bestFullCoverageArea = null;
+    let areaReductionAfterFullCoverage = null;
 
-    const genCount = coverage.length;
-    const maxGen = genCount - 1;
+    if (
+      hasValidMaxCoverage &&
+      reachedFullCoverage === 1 &&
+      firstFullCoverageGeneration !== censoredGeneration
+    ) {
+      const firstArea = areaSeries[firstFullCoverageGeneration];
 
-    const finalCoverage = Math.max(...coverage);
+      if (Number.isFinite(firstArea)) {
+        areaAtFirstFullCoverage = firstArea;
 
-    const targetCov = maxPossibleCoverage * coverageThreshold;
-    let gensToCoverageThreshold = maxGen;
-    for (let i = 0; i < genCount; i++) {
-        if (coverage[i] >= targetCov) {
-            gensToCoverageThreshold = i;
-            break;
-        }
-    }
+        for (let i = firstFullCoverageGeneration; i < generationCount; i++) {
+          const coverage = coverageSeries[i];
+          const area = areaSeries[i];
 
-    let aucCoverageRaw = 0;
-    if (maxGen > 0) {
-        for (let i = 0; i < maxGen; i++) {
-            aucCoverageRaw += (coverage[i] + coverage[i + 1]) / 2;
-        }
-    }
-    const aucCoverageNorm = maxGen > 0 ? aucCoverageRaw / (maxGen * maxPossibleCoverage) : 0;
-
-    const reachedFullCoverage = finalCoverage >= maxPossibleCoverage ? 1 : 0;
-
-    let finalArea = null;
-    let refinementTime = null;
-
-    if (reachedFullCoverage) {
-        let firstSuccessIdx = -1;
-        for (let i = 0; i < genCount; i++) {
-            if (coverage[i] >= maxPossibleCoverage) {
-                firstSuccessIdx = i;
-                break;
+          // Area is only meaningful for generations with full coverage.
+          if (
+            coverage >= maxPossibleCoverage &&
+            Number.isFinite(area)
+          ) {
+            if (
+              bestFullCoverageArea === null ||
+              area < bestFullCoverageArea
+            ) {
+              bestFullCoverageArea = area;
             }
+          }
         }
 
-        if (firstSuccessIdx === -1) {
-            firstSuccessIdx = coverage.indexOf(finalCoverage);
+        if (
+          Number.isFinite(areaAtFirstFullCoverage) &&
+          Number.isFinite(bestFullCoverageArea)
+        ) {
+          areaReductionAfterFullCoverage =
+            areaAtFirstFullCoverage - bestFullCoverageArea;
         }
-
-        if (firstSuccessIdx !== -1 && firstSuccessIdx < area.length) {
-            let best = area[firstSuccessIdx];
-            let bestIdx = firstSuccessIdx;
-
-            for (let i = firstSuccessIdx + 1; i < area.length; i++) {
-                if (area[i] < best) {
-                    best = area[i];
-                    bestIdx = i;
-                }
-            }
-
-            finalArea = best;
-            refinementTime = bestIdx - firstSuccessIdx;
-        } else {
-            finalArea = Math.min(...area);
-            refinementTime = maxGen;
-        }
+      }
     }
+
+    metrics.areaAtFirstFullCoverage = areaAtFirstFullCoverage;
+    metrics.bestFullCoverageArea = bestFullCoverageArea;
+    metrics.areaReductionAfterFullCoverage = areaReductionAfterFullCoverage;
+  }
+
+  if (includeDiversityMetrics) {
+    const diversitySeries = history.map(generation =>
+      generation?.diversity ?? null
+    );
 
     let diversityHalfLife = null;
     let diversityFinalInitialRatio = null;
-    let aucDiversityNorm = null;
 
-    const hasDiversity =
-        diversity.length === genCount &&
-        diversity.every(v => v !== null && v !== undefined);
+    const hasDiversityData =
+      diversitySeries.length === generationCount &&
+      diversitySeries.every(value => Number.isFinite(value));
 
-    if (hasDiversity && genCount > 0) {
-        const initDiv = diversity[0];
-        const finalDiv = diversity[genCount - 1];
+    if (hasDiversityData && generationCount > 0) {
+      const initialDiversity = diversitySeries[0];
+      const finalDiversity = diversitySeries[generationCount - 1];
 
-        if (Number.isFinite(initDiv) && initDiv !== 0) {
-            diversityFinalInitialRatio = finalDiv / initDiv;
-        } else if (initDiv === 0) {
-            diversityFinalInitialRatio = finalDiv === 0 ? 1 : Infinity;
-        }
+      if (initialDiversity > 0) {
+        diversityFinalInitialRatio = finalDiversity / initialDiversity;
 
-        if (initDiv > 0) {
-            const halfTarget = initDiv * 0.5;
+        const halfDiversityTarget = initialDiversity * 0.5;
 
-            for (let i = 1; i < genCount; i++) {
-                if (diversity[i] <= halfTarget) {
-                    const prev = diversity[i - 1];
-                    const curr = diversity[i];
-                    const denom = curr - prev;
+        for (let i = 1; i < generationCount; i++) {
+          if (diversitySeries[i] <= halfDiversityTarget) {
+            const previousDiversity = diversitySeries[i - 1];
+            const currentDiversity = diversitySeries[i];
+            const diversityDelta = currentDiversity - previousDiversity;
 
-                    if (denom === 0) {
-                        diversityHalfLife = i;
-                    } else {
-                        const frac = (halfTarget - prev) / denom;
-                        diversityHalfLife = (i - 1) + Math.min(1, Math.max(0, frac));
-                    }
-                    break;
-                }
+            if (diversityDelta === 0) {
+              diversityHalfLife = i;
+            } else {
+              const interpolationFraction =
+                (halfDiversityTarget - previousDiversity) /
+                diversityDelta;
+
+              diversityHalfLife =
+                (i - 1) + Math.min(1, Math.max(0, interpolationFraction));
             }
 
-            if (diversityHalfLife === null) {
-                diversityHalfLife = Infinity;
-            }
-        } else if (initDiv === 0) {
-            diversityHalfLife = 0;
+            break;
+          }
         }
 
-        let aucDivRaw = 0;
-        if (maxGen > 0) {
-            for (let i = 0; i < maxGen; i++) {
-                aucDivRaw += (diversity[i] + diversity[i + 1]) / 2;
-            }
+        // Diversity did not fall to 50% within the run budget.
+        if (diversityHalfLife === null) {
+          diversityHalfLife = censoredGeneration;
         }
-
-        if (maxGen > 0) {
-            if (Number.isFinite(initDiv) && initDiv > 0) {
-                aucDiversityNorm = aucDivRaw / (maxGen * initDiv);
-            } else if (initDiv === 0) {
-                aucDiversityNorm = aucDivRaw === 0 ? 0 : Infinity;
-            }
-        }
+      } else if (initialDiversity === 0) {
+        diversityFinalInitialRatio = finalDiversity === 0 ? 1 : null;
+        diversityHalfLife = 0;
+      }
     }
 
-    return {
-        finalCoverage,
-        gensToCoverageThreshold,
-        aucCoverageNorm,
-        finalArea,
-        refinementTime,
-        diversityHalfLife,
-        diversityFinalInitialRatio,
-        aucDiversityNorm,
-        reachedFullCoverage
-    };
+    metrics.diversityHalfLife = diversityHalfLife;
+    metrics.diversityFinalInitialRatio = diversityFinalInitialRatio;
+  }
+
+  return metrics;
 }
 
 export function filterMetrics(metrics, outputConfig) {
-    if (!metrics) return metrics;
+  if (!metrics) return metrics;
 
-    const requested = Array.isArray(outputConfig?.metrics) && outputConfig.metrics.length
-        ? outputConfig.metrics
-        : METRIC_KEYS;
+  const requestedMetrics = (
+    Array.isArray(outputConfig?.metrics) && outputConfig.metrics.length
+      ? outputConfig.metrics
+      : METRIC_KEYS
+  ).filter(metricEntry => {
+    const metricKey =
+      typeof metricEntry === 'string' ? metricEntry : metricEntry?.key;
 
-    const filtered = {};
-    for (const entry of requested) {
-        const key = typeof entry === 'string' ? entry : entry?.key;
-        if (key && key in METRIC_DEFINITIONS && key in metrics) {
-            filtered[key] = metrics[key];
-        }
+    return metricKey && metricKey in METRIC_DEFINITIONS;
+  });
+
+  const filteredMetrics = {};
+
+  for (const metricEntry of requestedMetrics) {
+    const metricKey =
+      typeof metricEntry === 'string' ? metricEntry : metricEntry?.key;
+
+    if (metricKey && metricKey in METRIC_DEFINITIONS && metricKey in metrics) {
+      filteredMetrics[metricKey] = metrics[metricKey];
     }
+  }
 
-    return filtered;
+  return filteredMetrics;
 }
 
 export function computeMetricsForResults(results, metricsConfig, outputConfig) {
-    if (!Array.isArray(results)) return [];
+  if (!Array.isArray(results)) return [];
 
-    return results.map(runData => ({
-        run: runData?.run ?? null,
-        metrics: filterMetrics(
-            computeRunMetrics(runData?.history, metricsConfig),
-            outputConfig
-        )
-    }));
+  return results.map(runData => ({
+    run: runData?.run ?? null,
+    metrics: filterMetrics(
+      computeRunMetrics(runData?.history, metricsConfig),
+      outputConfig
+    )
+  }));
 }
 
 export function getMetricLabel(metricKey, thresholdFraction = null) {
-    const def = METRIC_DEFINITIONS[metricKey];
-    if (!def) return metricKey ?? '-';
+  const metricDefinition = METRIC_DEFINITIONS[metricKey];
+  if (!metricDefinition) return metricKey ?? '-';
 
-    if (def.usesThresholdFraction && Number.isFinite(thresholdFraction)) {
-        return `${def.label} (${(thresholdFraction * 100).toFixed(0)}%)`;
-    }
+  if (
+    metricDefinition.usesThresholdFraction &&
+    Number.isFinite(thresholdFraction)
+  ) {
+    return `${metricDefinition.label} (${(thresholdFraction * 100).toFixed(0)}%)`;
+  }
 
-    return def.label;
+  return metricDefinition.label;
 }

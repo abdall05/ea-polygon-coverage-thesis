@@ -4,11 +4,9 @@ import { circularAngleDiff } from '../../utils/math.js';
 import { GEOMETRY_CONFIG } from '../geometry/geometryConfig.js';
 import { INDIVIDUAL_TYPES } from './individualConfig.js';
 
+
 export class FixedCenterPolarPolygonIndividual extends BasePolygonIndividual {
-  constructor(N, rng = null) {
-    super(INDIVIDUAL_TYPES.POLAR_FIXED_CENTER, N, rng);
-    this.genome = this.generateGenome();
-  }
+  static TYPE = INDIVIDUAL_TYPES.POLAR_FIXED_CENTER;
 
   generateGenome() {
     const { angles, radii } = PolygonGeometry.generateRandomPolygon(
@@ -24,7 +22,7 @@ export class FixedCenterPolarPolygonIndividual extends BasePolygonIndividual {
     return genome;
   }
 
-  decodePolygon() {
+  genomeToPoints() {
     const { x: cx, y: cy } = GEOMETRY_CONFIG.FIXED_POLAR_CENTER;
     const rawPoints = [];
 
@@ -38,19 +36,9 @@ export class FixedCenterPolarPolygonIndividual extends BasePolygonIndividual {
       });
     }
 
-    return PolygonGeometry.fixPolygonOrder(rawPoints);
+    return rawPoints;
   }
 
-  clone() {
-    const copy = Object.create(FixedCenterPolarPolygonIndividual.prototype);
-    copy.N = this.N;
-    copy.type = this.type;
-    copy.genome = [...this.genome];
-    copy.fitness = { ...this.fitness };
-    copy.rng = this.rng;
-    copy.lineage = this.lineage;
-    return copy;
-  }
 
   clampGenome() {
     const { x: cx, y: cy } = GEOMETRY_CONFIG.FIXED_POLAR_CENTER;
@@ -75,6 +63,17 @@ export class FixedCenterPolarPolygonIndividual extends BasePolygonIndividual {
       return 0;
     }
 
+    const { x: cx, y: cy } = GEOMETRY_CONFIG.FIXED_POLAR_CENTER;
+    const min = GEOMETRY_CONFIG.WORLD_MIN;
+    const max = GEOMETRY_CONFIG.WORLD_MAX;
+
+    const maxRadius = Math.max(
+      Math.hypot(cx - min, cy - min),
+      Math.hypot(cx - min, cy - max),
+      Math.hypot(cx - max, cy - min),
+      Math.hypot(cx - max, cy - max)
+    );
+
     let sum = 0;
 
     for (let i = 0; i < this.genome.length; i += 2) {
@@ -84,8 +83,12 @@ export class FixedCenterPolarPolygonIndividual extends BasePolygonIndividual {
       const thetaB = other.genome[i];
       const rB = other.genome[i + 1];
 
-      sum += circularAngleDiff(thetaA, thetaB) / Math.PI;
-      sum += Math.abs(rA - rB);
+      const angleDistance = circularAngleDiff(thetaA, thetaB) / Math.PI;
+      const radiusDistance =
+        maxRadius > 0 ? Math.abs(rA - rB) / maxRadius : 0;
+
+      sum += angleDistance;
+      sum += radiusDistance;
     }
 
     return sum / this.genome.length;

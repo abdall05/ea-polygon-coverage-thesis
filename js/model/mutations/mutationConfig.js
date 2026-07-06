@@ -13,10 +13,10 @@ export const DEFAULT_MUTATION_TYPE = MUTATION_TYPES.GAUSSIAN;
 const commonParams = Object.freeze({
   mutationRate: Object.freeze({
     label: 'Mutation Rate',
-    default: 0.1,
+    default: 0.05,
     min: 0,
     max: 1,
-    step: 0.01
+    step: 0.00001
   })
 });
 
@@ -42,88 +42,115 @@ const nonUniformParams = Object.freeze({
   })
 });
 
-const stepSizeParamsByRepresentation = Object.freeze({
-  [INDIVIDUAL_TYPES.CARTESIAN]: Object.freeze({
-    stepSize: Object.freeze({
-      label: 'Step Size',
-      default: 0.1,
-      min: 0,
-      step: 0.01
-    })
-  }),
-  [INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER]: Object.freeze({
-    centerStepSize: Object.freeze({
-      label: 'Center Step Size',
-      default: 0.1,
-      min: 0,
-      step: 0.01
-    }),
-    angleStepSize: Object.freeze({
-      label: 'Angle Step Size',
-      default: 0.1,
-      min: 0,
-      step: 0.01
-    }),
-    radiusStepSize: Object.freeze({
-      label: 'Radius Step Size',
-      default: 0.1,
-      min: 0,
-      step: 0.01
-    })
-  }),
-  [INDIVIDUAL_TYPES.POLAR_FIXED_CENTER]: Object.freeze({
-    angleStepSize: Object.freeze({
-      label: 'Angle Step Size',
-      default: 0.1,
-      min: 0,
-      step: 0.01
-    }),
-    radiusStepSize: Object.freeze({
-      label: 'Radius Step Size',
-      default: 0.1,
-      min: 0,
-      step: 0.01
-    })
+const cartesianStepSizeParams = Object.freeze({
+  stepSize: Object.freeze({
+    label: 'Step Size',
+    default: 0.05,
+    min: 0,
+    max: 1,
+    step: 0.001
   })
 });
 
+const polarVariableStepSizeParams = Object.freeze({
+  centerStepSize: Object.freeze({
+    label: 'Center Step Size',
+    default: 0.05,
+    min: 0,
+    max: 1,
+    step: 0.001
+  }),
+  angleStepSize: Object.freeze({
+    label: 'Angle Step Size',
+    default: 0.05,
+    min: 0,
+    max: 1,
+    step: 0.001
+  }),
+  radiusStepSize: Object.freeze({
+    label: 'Radius Step Size',
+    default: 0.05,
+    min: 0,
+    max: 1,
+    step: 0.001
+  })
+});
+
+const polarFixedStepSizeParams = Object.freeze({
+  angleStepSize: Object.freeze({
+    label: 'Angle Step Size',
+    default: 0.05,
+    min: 0,
+    step: 0.001
+  }),
+  radiusStepSize: Object.freeze({
+    label: 'Radius Step Size',
+    default: 0.05,
+    min: 0,
+    max: 1,
+    step: 0.001
+  })
+});
+
+const stepSizeParamsByRepresentation = Object.freeze({
+  [INDIVIDUAL_TYPES.CARTESIAN]: cartesianStepSizeParams,
+
+  [INDIVIDUAL_TYPES.CENTER_RELATIVE_CARTESIAN]: cartesianStepSizeParams,
+
+  [INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER]: polarVariableStepSizeParams,
+
+  [INDIVIDUAL_TYPES.POLAR_FIXED_CENTER]: polarFixedStepSizeParams
+});
+
+const REPRESENTATION_TYPES = Object.freeze([
+  INDIVIDUAL_TYPES.CARTESIAN,
+  INDIVIDUAL_TYPES.CENTER_RELATIVE_CARTESIAN,
+  INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER,
+  INDIVIDUAL_TYPES.POLAR_FIXED_CENTER
+]);
+
 function buildParamsByRepresentation(uniqueParams, repParams = null) {
-  return Object.freeze({
-    [INDIVIDUAL_TYPES.CARTESIAN]: Object.freeze({
-      ...commonParams,
-      ...uniqueParams,
-      ...(repParams?.[INDIVIDUAL_TYPES.CARTESIAN] ?? {})
-    }),
-    [INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER]: Object.freeze({
-      ...commonParams,
-      ...uniqueParams,
-      ...(repParams?.[INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER] ?? {})
-    }),
-    [INDIVIDUAL_TYPES.POLAR_FIXED_CENTER]: Object.freeze({
-      ...commonParams,
-      ...uniqueParams,
-      ...(repParams?.[INDIVIDUAL_TYPES.POLAR_FIXED_CENTER] ?? {})
-    })
-  });
+  return Object.freeze(
+    Object.fromEntries(
+      REPRESENTATION_TYPES.map(representationType => [
+        representationType,
+        Object.freeze({
+          ...commonParams,
+          ...uniqueParams,
+          ...(repParams?.[representationType] ?? {})
+        })
+      ])
+    )
+  );
 }
 
 export const mutationRegistry = Object.freeze({
   [MUTATION_TYPES.GAUSSIAN]: Object.freeze({
     label: 'Gaussian',
-    paramsByRepresentation: buildParamsByRepresentation(noParams, stepSizeParamsByRepresentation)
+    paramsByRepresentation: buildParamsByRepresentation(
+      noParams,
+      stepSizeParamsByRepresentation
+    )
   }),
+
   [MUTATION_TYPES.CAUCHY]: Object.freeze({
     label: 'Cauchy',
-    paramsByRepresentation: buildParamsByRepresentation(noParams, stepSizeParamsByRepresentation)
+    paramsByRepresentation: buildParamsByRepresentation(
+      noParams,
+      stepSizeParamsByRepresentation
+    )
   }),
+
   [MUTATION_TYPES.UNIFORM]: Object.freeze({
     label: 'Uniform',
     paramsByRepresentation: buildParamsByRepresentation(noParams)
   }),
+
   [MUTATION_TYPES.POLYNOMIAL]: Object.freeze({
     label: 'Polynomial',
     paramsByRepresentation: buildParamsByRepresentation(polynomialParams)
   }),
+
   [MUTATION_TYPES.NON_UNIFORM]: Object.freeze({
     label: 'Non-Uniform',
     paramsByRepresentation: buildParamsByRepresentation(nonUniformParams)

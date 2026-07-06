@@ -5,7 +5,7 @@ import { FitnessEvaluator } from '../model/fitness/FitnessEvaluator.js';
 import { EvolutionEngine } from '../model/engine/EvolutionEngine.js';
 import { createRNG } from '../utils/rng.js';
 
-function buildEngine({ evolutionParams, points, loggingOptions, seed }) {
+function buildEngine({ evolutionParams, points, resultConfig, seed }) {
     const useSeed = (seed !== undefined && seed !== null);
     const rngs = useSeed ? {
         initialization: createRNG(seed + 1),
@@ -60,20 +60,20 @@ function buildEngine({ evolutionParams, points, loggingOptions, seed }) {
 
     return new EvolutionEngine(
         engineConfig,
-        loggingOptions,
+        resultConfig,
         problemConfig,
         operators,
-        { initialization: rngs.initialization }
+        rngs.initialization
     );
 }
 
 self.onmessage = async (e) => {
-    const { evolutionParams, points, loggingOptions, updateInterval, numRuns, seed } = e.data;
+    const { evolutionParams, points, resultConfig, updateInterval, numRuns, seed } = e.data;
     const runs = (numRuns !== undefined && numRuns > 0) ? numRuns : 1;
 
     try {
         if (runs === 1) {
-            const engine = buildEngine({ evolutionParams, points, loggingOptions, seed });
+            const engine = buildEngine({ evolutionParams, points, resultConfig, seed });
             const result = engine.runWithProgress(
                 (gen) => self.postMessage({ type: 'progress', generation: gen }),
                 updateInterval || 10
@@ -86,7 +86,7 @@ self.onmessage = async (e) => {
         const baseSeed = (seed !== undefined && seed !== null) ? Number(seed) : null;
         for (let runIdx = 0; runIdx < runs; runIdx++) {
             const runSeed = baseSeed !== null ? baseSeed + runIdx * 10000 : null;
-            const engine = buildEngine({ evolutionParams, points, loggingOptions, seed: runSeed });
+            const engine = buildEngine({ evolutionParams, points, resultConfig, seed: runSeed });
             const result = engine.run();
             results.push({ run: runIdx + 1, history: result.history || [] });
             self.postMessage({ type: 'runProgress', runCompleted: runIdx + 1, totalRuns: runs });

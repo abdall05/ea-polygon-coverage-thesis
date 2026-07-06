@@ -47,14 +47,15 @@ import {
 import {
     experimentFieldConfig,
     DEFAULT_EXPERIMENT_CONFIG
-} from '../../model/experimentConfig.js';
+} from './experimentConfig.js';
 
 import {
     paramsToDefaults,
     parseIntInput,
     parseFloatInput,
     renderOptions,
-    renderParamInputs
+    renderParamInputs,
+    validateNumberInputsBeforeAction
 } from '../../utils/configUiHelpers.js';
 
 const createDefaultConfig = (id = null, name = '') => {
@@ -106,7 +107,12 @@ export class CompareConfigsExperiment {
                 numRuns: DEFAULT_EXPERIMENT_CONFIG.numRuns,
                 seed: DEFAULT_EXPERIMENT_CONFIG.seed
             },
-            thresholdFraction: DEFAULT_METRIC_CONFIG.thresholdFraction
+            thresholdFraction: DEFAULT_METRIC_CONFIG.thresholdFraction,
+            enabledGroups: {
+                coverage: true,
+                area: true,
+                diversity: true
+            }
         };
 
         this.points = null;
@@ -217,11 +223,20 @@ export class CompareConfigsExperiment {
                                         step="${metricFieldConfig.thresholdFraction.step}"
                                     >
                                 </div>
+
+                                <div class="param-row checkbox-row">
+                                    <input
+                                        id="compEnableDiversity"
+                                        type="checkbox"
+                                        ${this.global.enabledGroups.diversity ? 'checked' : ''}
+                                    >
+                                    <label for="compEnableDiversity">Include diversity</label>
+                                </div>
                             </div>
 
                             <div class="compare-metric-summary-label">Included outcome metrics</div>
                             <div class="compare-metric-tags">
-                            ${this._renderMetricGroupTags()}
+                                ${this._renderMetricGroupTags()}
                             </div>
                         </section>
                     </div>
@@ -247,14 +262,19 @@ export class CompareConfigsExperiment {
                         <h3 id="compare-configs-title">Compared Configurations</h3>
                         <div class="compare-subtitle">At least two configurations are required, with up to five total</div>
                     </div>
-                    <button id="addConfigBtn" class="secondary" type="button">Add configuration</button>
                 </div>
 
                 <div id="configsContainer" class="configs-container"></div>
 
+                <div class="compare-config-add-row">
+                    <button id="addConfigBtn" class="secondary" type="button">Add configuration</button>
+                </div>
+
                 <div class="exp-actions compare-actions">
                     <button id="runCompareBtn" class="primary" type="button">Run comparison</button>
-                    <button id="clearCompareBtn" class="secondary" type="button">Reset</button>
+                    <button id="clearCompareBtn" class="secondary" type="button" disabled>
+                        Clear Results
+                    </button>
                 </div>
             </section>
 
@@ -280,9 +300,9 @@ export class CompareConfigsExperiment {
             <section id="compResultsPanel" class="compare-results" style="display:none;" aria-labelledby="compare-results-title">
                 <div class="compare-results-header">
                     <div>
-                        <h3 id="compare-results-title">Statistical Results</h3>
+                        <h3 id="compResultsTitle">Statistical Results</h3>
                         <div class="compare-subtitle">
-                            Descriptive summaries, omnibus significance tests, and corrected pairwise comparisons
+                            Run-level metric summaries and statistical comparisons
                         </div>
                     </div>
                 </div>
@@ -293,19 +313,17 @@ export class CompareConfigsExperiment {
     }
 
     _renderMetricGroupTags() {
-        const groups = new Map();
-
-        for (const def of Object.values(METRIC_DEFINITIONS)) {
-            const group = def.group || 'other';
-            if (!groups.has(group)) groups.set(group, []);
-            groups.get(group).push(def);
-        }
-
         const orderedGroups = ['coverage', 'area', 'diversity'];
+
         return orderedGroups
-            .filter(group => groups.has(group))
+            .filter(group => this.global.enabledGroups?.[group] !== false)
             .map(group => {
-                const defs = groups.get(group) || [];
+                const defs = METRIC_KEYS
+                    .map(key => METRIC_DEFINITIONS[key])
+                    .filter(def => def && def.group === group);
+
+                if (!defs.length) return '';
+
                 const title = group.charAt(0).toUpperCase() + group.slice(1);
 
                 return `
@@ -323,6 +341,22 @@ export class CompareConfigsExperiment {
             `;
             })
             .join('');
+    }
+
+    _getEnabledMetricKeys() {
+        return METRIC_KEYS.filter(key => {
+            const def = METRIC_DEFINITIONS[key];
+            const group = def?.group;
+            return def && (!group || this.global.enabledGroups?.[group] !== false);
+        });
+    }
+
+    _setClearButtonState({ disabled, text }) {
+        const clearBtn = this.container.querySelector('#clearCompareBtn');
+        if (!clearBtn) return;
+
+        clearBtn.disabled = disabled;
+        clearBtn.textContent = text;
     }
 
     _cacheDomReferences() {
@@ -446,6 +480,7 @@ export class CompareConfigsExperiment {
 
         return cardDiv;
     }
+
     _populateConfigCardUI(cfg) {
         const repBody = this.container.querySelector(`#cmp-rep-body-${cfg.id}`);
         const mutBody = this.container.querySelector(`#cmp-mut-body-${cfg.id}`);
@@ -652,6 +687,17 @@ export class CompareConfigsExperiment {
         }
 
         if (target.id === 'runCompareBtn') {
+            if (!validateNumberInputsBeforeAction(
+                this.container,
+                input => this._handleChange({ target: input }),
+                {
+                    selector: '.compare-experiment input[type="number"]:not(:disabled)',
+                    message: 'Some invalid inputs were reset to their default values. Please review them and click Run comparison again.'
+                }
+            )) {
+                return;
+            }
+
             this._runComparison();
             return;
         }
@@ -702,7 +748,16 @@ export class CompareConfigsExperiment {
                     metricFieldConfig.thresholdFraction.default,
                     metricFieldConfig.thresholdFraction
                 );
+                {
+                    const metricTags = this.container.querySelector('.compare-metric-tags');
+                    if (metricTags) {
+                        metricTags.innerHTML = this._renderMetricGroupTags();
+                    }
+                }
+                return;
 
+            case 'compEnableDiversity':
+                this.global.enabledGroups.diversity = !!target.checked;
                 {
                     const metricTags = this.container.querySelector('.compare-metric-tags');
                     if (metricTags) {
@@ -899,7 +954,12 @@ export class CompareConfigsExperiment {
         const resultsPanel = this.dom.resultsPanel;
 
         runBtn.disabled = true;
-        clearBtn.disabled = true;
+
+        this._setClearButtonState({
+            disabled: false,
+            text: 'Stop Run'
+        });
+
         progressDiv.style.display = 'block';
         resultsPanel.style.display = 'none';
 
@@ -941,10 +1001,10 @@ export class CompareConfigsExperiment {
                 nVertices: cfg.representation.nVertices
             };
 
-            const loggingOptions = {
+            const resultConfig = {
                 storePopulation: false,
                 includeAvgFitness: false,
-                diversity: 'per-generation',
+                includeDiversity: this.global.enabledGroups.diversity,
                 lineageTracking: false
             };
 
@@ -952,10 +1012,11 @@ export class CompareConfigsExperiment {
 
             const rawResults = await this._runSingleConfigWithProgress(
                 evolutionParams,
-                loggingOptions,
+                resultConfig,
                 totalRunsPerConfig,
                 configSeed
             );
+
             const processedResults = await this._computeMetricsForResults(rawResults);
 
             this.configResults.push({
@@ -968,7 +1029,12 @@ export class CompareConfigsExperiment {
         this.container.querySelector('#compProgressFill').style.width = '100%';
         this.isRunning = false;
         runBtn.disabled = false;
-        clearBtn.disabled = false;
+
+        this._setClearButtonState({
+            disabled: false,
+            text: 'Clear Results'
+        });
+
         progressDiv.style.display = 'none';
         resultsPanel.style.display = 'block';
 
@@ -985,9 +1051,11 @@ export class CompareConfigsExperiment {
         return baseSeed + configIdx * 1000000;
     }
 
-    _runSingleConfigWithProgress(evolutionParams, loggingOptions, totalRuns, seed) {
+    _runSingleConfigWithProgress(evolutionParams, resultConfig, totalRuns, seed) {
         return new Promise((resolve) => {
-            const worker = new Worker('./js/workers/evolutionWorker.js', { type: 'module' });
+            const worker = new Worker(new URL('../../workers/evolutionWorker.js', import.meta.url), {
+                type: 'module'
+            });
             this.workers.push(worker);
 
             worker.onmessage = (e) => {
@@ -1012,7 +1080,7 @@ export class CompareConfigsExperiment {
             worker.postMessage({
                 evolutionParams,
                 points: this.points,
-                loggingOptions,
+                resultConfig,
                 numRuns: totalRuns,
                 seed
             });
@@ -1021,8 +1089,9 @@ export class CompareConfigsExperiment {
 
     _computeMetricsForResults(rawResults) {
         return new Promise((resolve) => {
-            const worker = new Worker('./js/workers/metricsWorker.js', { type: 'module' });
-
+            const worker = new Worker(new URL('../../workers/metricsWorker.js', import.meta.url), {
+                type: 'module'
+            });
             worker.onmessage = (e) => {
                 const data = e.data;
 
@@ -1039,15 +1108,18 @@ export class CompareConfigsExperiment {
             worker.postMessage({
                 results: rawResults,
                 metricsConfig: {
-                    maxPossibleCoverage: this.global.pointDistribution.params.count ?? 100,
-                    coverageThreshold: this.global.thresholdFraction
+                    maxPossibleCoverage: this.points?.length ?? 100,
+                    thresholdFraction: this.global.thresholdFraction,
+                    enabledGroups: this.global.enabledGroups
                 },
                 outputConfig: {
-                    metrics: METRIC_KEYS
+                    metrics: this._getEnabledMetricKeys()
                 }
             });
         });
-    } _captureConfigSnapshot(cfg) {
+    }
+
+    _captureConfigSnapshot(cfg) {
         const mutationDef = getMutationDefinition(cfg.mutation.type, cfg.representation.type);
         const crossoverDef = getCrossoverDefinition(cfg.crossover.type);
 
@@ -1081,7 +1153,8 @@ export class CompareConfigsExperiment {
     _renderResultsTables() {
         this.statisticsResults = computeExperimentStatistics(this.configResults, {
             alpha: 0.05,
-            thresholdFraction: this.global.thresholdFraction
+            thresholdFraction: this.global.thresholdFraction,
+            metrics: this._getEnabledMetricKeys()
         });
         this._renderStatisticalTests();
     }
@@ -1095,42 +1168,133 @@ export class CompareConfigsExperiment {
             return;
         }
 
-        const metricResults = this.statisticsResults.metricResults || [];
+        const metricResults = this._sortMetricResults(this.statisticsResults.metricResults || []);
         const grouped = this._groupMetricResults(metricResults);
+
+        const sectionMeta = {
+            coverage: {
+                title: 'Coverage metrics',
+                subtitle: 'Coverage performance, full-coverage success, and speed of reaching high or full coverage.'
+            },
+            area: {
+                title: 'Post-success area metrics',
+                subtitle: 'Area metrics computed only from runs that reached full coverage.'
+            },
+            diversity: {
+                title: 'Diversity metrics',
+                subtitle: 'Diagnostic metrics describing diversity loss and final diversity retention.'
+            }
+        };
+
+        const orderedGroups = ['coverage', 'area', 'diversity'];
+
+        const sectionsHtml = orderedGroups
+            .filter(group => this.global.enabledGroups?.[group] !== false)
+            .map(group => this._renderMetricSection(
+                sectionMeta[group]?.title ?? group,
+                sectionMeta[group]?.subtitle ?? '',
+                grouped[group] || []
+            ))
+            .join('');
 
         container.innerHTML = `
             ${this._renderExperimentContext()}
             ${this._renderConfigsSummaryTable(this.configSnapshots)}
-            ${this._renderMetricSection(
-            'Coverage metrics',
-            'Coverage outcomes, convergence threshold behaviour, and success rate.',
-            grouped.coverage
-        )}
-            ${this._renderMetricSection(
-            'Area metrics',
-            'Area is interpreted only on successful full-coverage runs.',
-            grouped.area
-        )}
-            ${this._renderMetricSection(
-            'Diversity metrics',
-            'Population diversity summaries across the run.',
-            grouped.diversity
-        )}
-        `;
+            ${this._renderResultsGuide()}
+            ${sectionsHtml}
+            `;
+    }
+    _renderResultsGuide() {
+        const isTwoConfigMode = this.configs.length === 2;
+
+        const testDescription = isTwoConfigMode
+            ? "Two configurations: numeric metrics use Mann-Whitney U tests; the binary full-coverage metric uses Fisher's exact test."
+            : "Three or more configurations: omnibus p-values test for an overall difference across configurations; pairwise p-values are Bonferroni-corrected.";
+
+        return `
+    <section class="stats-section compare-panel">
+        <div class="stats-section-head">
+            <div>
+                <h4>Result interpretation</h4>
+                <div class="compare-subtitle">Summary format and statistical comparison rules used below</div>
+            </div>
+        </div>
+
+        <div class="context-groups-grid">
+            <div class="context-group-card">
+                <div class="context-group-title">Reported values</div>
+                <div class="context-group-rows">
+                    <div class="context-row">
+                        <span class="context-row-label">Numeric metrics</span>
+                        <span class="context-row-value">median [Q1, Q3]</span>
+                    </div>
+                    <div class="context-row">
+                        <span class="context-row-label">Binary metrics</span>
+                        <span class="context-row-value">successful runs / total runs</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="context-group-card">
+                <div class="context-group-title">Tests</div>
+                <div class="context-group-rows">
+                    <div class="context-row">
+                        <span class="context-row-label">Procedure</span>
+                        <span class="context-row-value">${this._escapeHtml(testDescription)}</span>
+                    </div>
+                    <div class="context-row">
+                        <span class="context-row-label">Significance level</span>
+                        <span class="context-row-value">${this._escapeHtml(`α = ${this._formatAlpha()}`)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="context-group-card">
+                <div class="context-group-title">Special cases</div>
+                <div class="context-group-rows">
+                    <div class="context-row">
+                        <span class="context-row-label">Unreached generation events</span>
+                        <span class="context-row-value">reported as T + 1</span>
+                    </div>
+                    <div class="context-row">
+                        <span class="context-row-label">Area metrics</span>
+                        <span class="context-row-value">only runs that reached full coverage</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+`;
+    }
+
+
+    _formatAlpha() {
+        const alpha = Number.isFinite(this.statisticsResults?.alpha)
+            ? this.statisticsResults.alpha
+            : 0.05;
+
+        return alpha.toFixed(2);
+    }
+
+    _sortMetricResults(metricResults = []) {
+        const order = new Map(METRIC_KEYS.map((key, index) => [key, index]));
+
+        return [...metricResults].sort((a, b) => {
+            const ia = order.has(a.metric) ? order.get(a.metric) : Number.MAX_SAFE_INTEGER;
+            const ib = order.has(b.metric) ? order.get(b.metric) : Number.MAX_SAFE_INTEGER;
+            return ia - ib;
+        });
     }
 
     _groupMetricResults(metricResults) {
-        const groups = {
-            coverage: [],
-            area: [],
-            diversity: []
-        };
+        const groups = {};
 
-        for (const metricResult of metricResults) {
+        for (const metricResult of this._sortMetricResults(metricResults || [])) {
             const group = METRIC_DEFINITIONS[metricResult.metric]?.group;
-            if (group && groups[group]) {
-                groups[group].push(metricResult);
-            }
+            if (!group) continue;
+            if (this.global.enabledGroups?.[group] === false) continue;
+            if (!groups[group]) groups[group] = [];
+            groups[group].push(metricResult);
         }
 
         return groups;
@@ -1179,7 +1343,7 @@ export class CompareConfigsExperiment {
                     <div class="context-group-title">Point set</div>
                     <div class="context-group-rows">
                         <div class="context-row">
-                            <span class="context-row-label">Point Set</span>
+                            <span class="context-row-label">Distribution</span>
                             <span class="context-row-value">${this._escapeHtml(String(pointSetLabel))}</span>
                         </div>
                         ${pointParamEntries.map(entry => `
@@ -1192,11 +1356,23 @@ export class CompareConfigsExperiment {
                 </div>
 
                 <div class="context-group-card">
-                    <div class="context-group-title">Metrics</div>
+                    <div class="context-group-title">Metric rules</div>
                     <div class="context-group-rows">
                         <div class="context-row">
-                            <span class="context-row-label">Coverage Threshold</span>
+                            <span class="context-row-label">Coverage threshold</span>
                             <span class="context-row-value">${this._escapeHtml(`${(this.global.thresholdFraction * 100).toFixed(0)}%`)}</span>
+                        </div>
+                        <div class="context-row">
+                            <span class="context-row-label">Unreached generation events</span>
+                            <span class="context-row-value">T + 1</span>
+                        </div>
+                        <div class="context-row">
+                            <span class="context-row-label">Area metrics</span>
+                            <span class="context-row-value">Only runs that reached full coverage</span>
+                        </div>
+                        <div class="context-row">
+                            <span class="context-row-label">Diversity metrics</span>
+                            <span class="context-row-value">${this._escapeHtml(this.global.enabledGroups.diversity ? 'Included' : 'Excluded')}</span>
                         </div>
                     </div>
                 </div>
@@ -1208,19 +1384,80 @@ export class CompareConfigsExperiment {
     _renderMetricSection(title, subtitle, metricResults) {
         if (!metricResults?.length) return '';
 
-        return `
-            <section class="stats-section compare-panel">
-                <div class="stats-section-head">
-                    <div>
-                        <h4>${this._escapeHtml(title)}</h4>
-                        <div class="compare-subtitle">${this._escapeHtml(subtitle)}</div>
-                    </div>
-                </div>
+        const isTwoConfigMode = this.configs.length === 2;
 
+        return `
+    <section class="stats-section compare-panel">
+        <div class="stats-section-head">
+            <div>
+                <h4>${this._escapeHtml(title)}</h4>
+                <div class="compare-subtitle">${this._escapeHtml(subtitle)}</div>
+            </div>
+        </div>
+
+        ${isTwoConfigMode
+                ? this._buildTwoConfigResultsTable(metricResults)
+                : `
                 ${this._buildMetricsSummaryTable(metricResults)}
                 ${this._buildPairwiseTableForMetrics(metricResults)}
-            </section>
+            `
+            }
+    </section>
+`;
+    }
+
+    _buildTwoConfigResultsTable(metricResults) {
+        const [configA, configB] = this.configs;
+
+        const rows = this._sortMetricResults(metricResults).map(metricResult => {
+            const groupA = this._findGroupSummary(metricResult, configA.name);
+            const groupB = this._findGroupSummary(metricResult, configB.name);
+            const pair = Array.isArray(metricResult.pairwise) ? metricResult.pairwise[0] : null;
+
+            const metricKind = METRIC_DEFINITIONS[metricResult.metric]?.kind || 'numeric';
+
+            const summaryA = metricKind === 'binary'
+                ? this._formatBinarySummary(groupA)
+                : this._formatSummary(groupA, metricResult.metric);
+
+            const summaryB = metricKind === 'binary'
+                ? this._formatBinarySummary(groupB)
+                : this._formatSummary(groupB, metricResult.metric);
+
+            const pValue = pair?.pAdjusted ?? pair?.p;
+
+            return `
+            <tr>
+                <td class="metric-name">
+                    <div>${this._escapeHtml(this._formatDisplayMetricName(metricResult.metric))}</div>
+                    <div class="metric-direction">${this._escapeHtml(this._formatMetricDirection(metricResult.metric))}</div>
+                </td>
+                <td class="metric-summary">${this._escapeHtml(summaryA)}</td>
+                <td class="metric-summary">${this._escapeHtml(summaryB)}</td>
+                <td>${this._escapeHtml(this._getDisplayTestName(metricResult))}</td>
+                <td class="pairwise-pcell">${this._formatPairwisePLine(pValue)}</td>
+            </tr>
         `;
+        }).join('');
+
+        return `
+<div class="stats-table-block">
+    <div class="plain-table-wrap">
+        <table class="compare-stats-table compare-two-config-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>${this._escapeHtml(configA.name)}</th>
+                    <th>${this._escapeHtml(configB.name)}</th>
+                    <th>Test</th>
+                    <th>p-value</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>
+</div>
+`;
     }
 
     _buildMetricsSummaryTable(metricResults) {
@@ -1228,52 +1465,41 @@ export class CompareConfigsExperiment {
         <tr>
             <th>Metric</th>
             ${this.configs.map(cfg => `<th>${this._escapeHtml(cfg.name)}</th>`).join('')}
-            <th>Overall diff.</th>
+            <th>Omnibus test</th>
+            <th>Omnibus result</th>
         </tr>
     `;
 
-        const rows = metricResults.map(metricResult => {
+        const rows = this._sortMetricResults(metricResults).map(metricResult => {
             const summaryCells = this.configs.map(cfg => {
-                if (metricResult.metric === 'reachedFullCoverage') {
-                    return `<td class="metric-summary">${this._escapeHtml(this._formatSuccessRate(cfg.name))}</td>`;
-                }
-
                 const group = this._findGroupSummary(metricResult, cfg.name);
-                return `<td class="metric-summary">${this._escapeHtml(this._formatSummary(group))}</td>`;
+                const metricKind = METRIC_DEFINITIONS[metricResult.metric]?.kind || 'numeric';
+
+                return `<td class="metric-summary">${this._escapeHtml(
+                    metricKind === 'binary'
+                        ? this._formatBinarySummary(group)
+                        : this._formatSummary(group, metricResult.metric)
+                )}</td>`;
             }).join('');
 
             const omnibus = metricResult.omnibus;
-            let omnibusCell = `<td class="omnibus-cell omnibus-cell-empty">-</td>`;
-
-            if (omnibus) {
-                const isSig = !!omnibus.significant;
-                const cls = isSig
-                    ? 'omnibus-cell omnibus-cell-sig'
-                    : 'omnibus-cell omnibus-cell-ns';
-
-                omnibusCell = `
-                <td class="${cls}">
-                    <div class="omnibus-status">${isSig ? 'Significant' : 'Not significant'}</div>
-                    <div class="omnibus-pvalue">p = ${this._escapeHtml(this._formatPValue(omnibus.p))}</div>
-                </td>
-            `;
-            }
 
             return `
             <tr>
-                <td class="metric-name">${this._escapeHtml(this._formatDisplayMetricName(metricResult.metric))}</td>
+                <td class="metric-name">
+                    <div>${this._escapeHtml(this._formatDisplayMetricName(metricResult.metric))}</div>
+                    <div class="metric-direction">${this._escapeHtml(this._formatMetricDirection(metricResult.metric))}</div>
+                </td>
                 ${summaryCells}
-                ${omnibusCell}
+                <td class="omnibus-cell">${this._escapeHtml(omnibus?.test || '-')}</td>
+                <td class="omnibus-cell">${this._formatOmnibusResult(omnibus)}</td>
             </tr>
         `;
         }).join('');
 
         return `
         <div class="stats-table-block">
-            <div class="stats-table-title">Table A — descriptive summaries + omnibus test</div>
-            <div class="stats-table-note">
-                Continuous metrics are shown as median [Q1, Q3]. Success rate is shown as successful runs / total runs (%). The final column shows the omnibus significance result for 3+ configs.
-            </div>
+            <div class="stats-table-title">Summary and omnibus test</div>
             <div class="plain-table-wrap">
                 <table class="compare-stats-table">
                     <thead>${topHeader}</thead>
@@ -1284,14 +1510,28 @@ export class CompareConfigsExperiment {
     `;
     }
 
+    _getDisplayTestName(metricResult) {
+        const metricKind = METRIC_DEFINITIONS[metricResult.metric]?.kind || 'numeric';
+        return metricKind === 'binary' ? "Fisher's exact test" : 'Mann-Whitney U';
+    }
+
+    _formatBinarySummary(group) {
+        if (!group || !Number.isFinite(group.n) || group.n <= 0) return '-';
+
+        const successes = Number.isFinite(group.successes) ? group.successes : 0;
+
+        return `${successes}/${group.n}`;
+    }
+
     _buildPairwiseTableForMetrics(metricResults) {
-        const pairwiseMetrics = (metricResults || []).filter(
-            (mr) => mr.metric !== 'reachedFullCoverage'
+        const pairwiseMetrics = this._sortMetricResults(metricResults).filter(
+            mr => Array.isArray(mr.pairwise) && mr.pairwise.length > 0
         );
 
         if (!pairwiseMetrics.length) return '';
 
         const pairLabels = [];
+
         for (let i = 0; i < this.configs.length; i++) {
             for (let j = i + 1; j < this.configs.length; j++) {
                 pairLabels.push([
@@ -1303,46 +1543,43 @@ export class CompareConfigsExperiment {
             }
         }
 
-        const headerCols = ['<th>Metric</th>']
-            .concat(
-                pairLabels.map(([, , aLetter, bLetter]) =>
-                    `<th>${this._escapeHtml(aLetter)} vs ${this._escapeHtml(bLetter)}</th>`
-                )
+        const headerCols = [
+            '<th>Metric</th>',
+            ...pairLabels.map(([, , aLetter, bLetter]) =>
+                `<th>${this._escapeHtml(aLetter)} vs ${this._escapeHtml(bLetter)}</th>`
             )
-            .join('');
+        ].join('');
 
         const rows = pairwiseMetrics.map(metricResult => {
             const pairwiseMap = new Map();
 
-            for (const row of (metricResult.pairwise || [])) {
-                pairwiseMap.set(`${row.configA}|||${row.configB}`, row);
-                pairwiseMap.set(`${row.configB}|||${row.configA}`, row);
+            for (const row of metricResult.pairwise) {
+                pairwiseMap.set(`${row.configA}__${row.configB}`, row);
+                pairwiseMap.set(`${row.configB}__${row.configA}`, row);
             }
 
             const cells = pairLabels.map(([aName, bName]) => {
-                const row = pairwiseMap.get(`${aName}|||${bName}`);
-                if (!row) return `<td class="pairwise-pcell pairwise-pcell-empty">-</td>`;
+                const row = pairwiseMap.get(`${aName}__${bName}`);
 
-                const pAdj = row.pAdjusted ?? row.p;
-                const isSig = Number.isFinite(pAdj)
-                    ? pAdj <= (this.statisticsResults?.alpha ?? 0.05)
-                    : false;
+                if (!row) {
+                    return `<td class="pairwise-pcell pairwise-pcell-empty">-</td>`;
+                }
 
-                const cls = isSig
-                    ? 'pairwise-pcell pairwise-pcell-sig'
-                    : 'pairwise-pcell pairwise-pcell-ns';
+                const pAdjusted = row.pAdjusted ?? row.p;
 
                 return `
-                <td class="${cls}">
-                    <div class="pairwise-badge">${isSig ? 'Significant' : 'Not significant'}</div>
-                    <div class="pairwise-pvalue">p = ${this._escapeHtml(this._formatPValue(pAdj))}</div>
+                <td class="pairwise-pcell">
+                    p<sub>adj</sub> ${this._escapeHtml(this._formatPValue(pAdjusted))}
                 </td>
             `;
             }).join('');
 
             return `
             <tr>
-                <td class="metric-name">${this._escapeHtml(this._formatDisplayMetricName(metricResult.metric))}</td>
+                <td class="metric-name">
+                    <div>${this._escapeHtml(this._formatDisplayMetricName(metricResult.metric))}</div>
+                    <div class="metric-direction">${this._escapeHtml(this._formatMetricDirection(metricResult.metric))}</div>
+                </td>
                 ${cells}
             </tr>
         `;
@@ -1350,13 +1587,12 @@ export class CompareConfigsExperiment {
 
         return `
         <div class="stats-table-block">
-            <div class="stats-table-title">Table B — corrected pairwise comparisons</div>
-            <div class="stats-table-note">
-                Bonferroni-corrected pairwise p-values for comparable continuous metrics only. Compare each corrected p-value directly with 0.05.
-            </div>
+            <div class="stats-table-title">Pairwise comparisons</div>
             <div class="plain-table-wrap">
                 <table class="compare-stats-table compare-pairwise-table">
-                    <thead><tr>${headerCols}</tr></thead>
+                    <thead>
+                        <tr>${headerCols}</tr>
+                    </thead>
                     <tbody>${rows}</tbody>
                 </table>
             </div>
@@ -1364,9 +1600,44 @@ export class CompareConfigsExperiment {
     `;
     }
 
+
+    _formatMetricDirection(metric) {
+        const direction = METRIC_DEFINITIONS[metric]?.direction;
+
+        if (direction === 'higher') return 'higher is better';
+        if (direction === 'lower') return 'lower is better';
+        if (direction === 'diagnostic') return 'diagnostic';
+
+        return '';
+    }
+
+
+    _formatPairwisePLine(value) {
+        return `
+        <div class="pairwise-pvalue">p ${this._escapeHtml(this._formatPValue(value))}</div>
+    `;
+    }
+
+    _formatOmnibusResult(omnibus) {
+        if (!omnibus) return '-';
+
+        return `
+        <div class="omnibus-pvalue">p ${this._escapeHtml(this._formatPValue(omnibus.p))}</div>
+    `;
+    }
+
     _formatPValue(value) {
-        if (value == null || Number.isNaN(value) || !Number.isFinite(value)) return '-';
-        return Number(value).toExponential(3);
+        if (value == null || Number.isNaN(value) || !Number.isFinite(value)) {
+            return '-';
+        }
+
+        const p = Number(value);
+
+        if (p < 0.001) {
+            return '< 0.001';
+        }
+
+        return `= ${p.toFixed(3)}`;
     }
 
     _formatDisplayMetricName(metric) {
@@ -1388,9 +1659,21 @@ export class CompareConfigsExperiment {
         return Number(value).toFixed(4);
     }
 
-    _formatSummary(group) {
-        if (!group) return '-';
-        return `${this._formatMetricValue(group.median)} [${this._formatMetricValue(group.q1)}, ${this._formatMetricValue(group.q3)}]`;
+    _formatSummary(group, metricKey = null) {
+        if (!group || !Number.isFinite(group.n) || group.n <= 0) return '-';
+
+        const summary =
+            `${this._formatMetricValue(group.median)} ` +
+            `[${this._formatMetricValue(group.q1)}, ${this._formatMetricValue(group.q3)}]`;
+
+        const metricDef = METRIC_DEFINITIONS[metricKey] || {};
+        const totalRuns = Number(this.global?.experiment?.numRuns);
+
+        const shouldShowN =
+            metricDef.conditionalOnFullCoverage ||
+            (Number.isFinite(totalRuns) && group.n !== totalRuns);
+
+        return shouldShowN ? `${summary} (n=${group.n})` : summary;
     }
 
     _findGroupSummary(metricResult, configName) {
@@ -1407,7 +1690,7 @@ export class CompareConfigsExperiment {
     }
 
     _getConfigLetter(configName) {
-        const match = String(configName || '').match(/Config\\s+([A-Z])/i);
+        const match = String(configName || '').match(/Config\s+([A-Z])/i);
         return match ? match[1].toUpperCase() : String(configName || '').trim();
     }
 
@@ -1542,64 +1825,54 @@ export class CompareConfigsExperiment {
     }
 
     _clearAll() {
-        if (this.isRunning) {
-            if (this.workers.length) this.workers.forEach(w => w.terminate());
-            this.isRunning = false;
+        if (this.workers.length) {
+            this.workers.forEach(worker => worker.terminate());
         }
 
+        this.isRunning = false;
+        this.workers = [];
         this.configResults = [];
         this.statisticsResults = null;
         this.configSnapshots = [];
-        this.workers = [];
 
         const progressDiv = this.dom.progressSection;
         const resultsPanel = this.dom.resultsPanel;
+        const statisticsContent = this.container.querySelector('#compStatisticsContent');
+
         if (progressDiv) progressDiv.style.display = 'none';
         if (resultsPanel) resultsPanel.style.display = 'none';
+        if (statisticsContent) statisticsContent.innerHTML = '';
 
         const runBtn = this.container.querySelector('#runCompareBtn');
-        const clearBtn = this.container.querySelector('#clearCompareBtn');
         if (runBtn) runBtn.disabled = false;
-        if (clearBtn) clearBtn.disabled = false;
 
-        const pointDistType = POINT_DISTRIBUTION_TYPES.UNIFORM;
-        const pointDistDef = getPointDistributionDefinition(pointDistType);
+        this._setClearButtonState({
+            disabled: true,
+            text: 'Clear Results'
+        });
 
-        this.global = {
-            pointDistribution: {
-                type: pointDistType,
-                params: paramsToDefaults(pointDistDef?.params)
-            },
-            experiment: {
-                numRuns: DEFAULT_EXPERIMENT_CONFIG.numRuns,
-                seed: DEFAULT_EXPERIMENT_CONFIG.seed
-            },
-            thresholdFraction: DEFAULT_METRIC_CONFIG.thresholdFraction
-        };
+        const currentConfig = this.container.querySelector('#compCurrentConfig');
+        const totalConfigs = this.container.querySelector('#compTotalConfigs');
+        const currentRun = this.container.querySelector('#compCurrentRun');
+        const totalRuns = this.container.querySelector('#compTotalRuns');
+        const configProgress = this.container.querySelector('#compProgressFill');
+        const runProgress = this.container.querySelector('#compRunProgressFill');
 
-        this.configs = [];
-        this.nextConfigId = 1;
-
-        const pointDistSelect = this.container.querySelector('#compPointDistType');
-        const numRunsInput = this.container.querySelector('#compNumRuns');
-        const seedInput = this.container.querySelector('#compSeed');
-        const thresholdInput = this.container.querySelector('#compThresholdFraction');
-
-        if (pointDistSelect) pointDistSelect.value = this.global.pointDistribution.type;
-        if (numRunsInput) numRunsInput.value = this.global.experiment.numRuns;
-        if (seedInput) seedInput.value = this.global.experiment.seed;
-        if (thresholdInput) thresholdInput.value = this.global.thresholdFraction;
-
-        this._renderPointDistForm();
-        this._addNewConfig();
-        this._addNewConfig();
-        this._renderAllConfigCards();
-        this._generatePoints();
-        this._drawPreview();
+        if (currentConfig) currentConfig.textContent = '0';
+        if (totalConfigs) totalConfigs.textContent = '0';
+        if (currentRun) currentRun.textContent = '0';
+        if (totalRuns) totalRuns.textContent = '0';
+        if (configProgress) configProgress.style.width = '0%';
+        if (runProgress) runProgress.style.width = '0%';
     }
 
     destroy() {
-        if (this.workers.length) this.workers.forEach(w => w.terminate());
+        if (this.workers.length) {
+            this.workers.forEach(worker => worker.terminate());
+        }
+
+        this.workers = [];
+        this.isRunning = false;
         this.container.innerHTML = '';
     }
 }

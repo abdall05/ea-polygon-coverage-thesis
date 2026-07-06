@@ -1,63 +1,91 @@
 export const metricFieldConfig = Object.freeze({
   thresholdFraction: Object.freeze({
-    label: 'Coverage threshold',
+    label: 'Coverage threshold fraction',
     default: 0.95,
-    min: 0,
+    min: 0.5,
     max: 1,
     step: 0.01
   })
 });
 
 export const DEFAULT_METRIC_CONFIG = Object.freeze({
-  thresholdFraction: metricFieldConfig.thresholdFraction.default
+  thresholdFraction: metricFieldConfig.thresholdFraction.default,
+  enabledGroups: Object.freeze({
+    coverage: true,
+    area: true,
+    diversity: true
+  })
 });
 
 const METRIC_DEFINITIONS_RAW = Object.freeze({
-  finalCoverage: Object.freeze({
-    label: 'Final coverage',
-    group: 'coverage'
+  bestCoverageReached: Object.freeze({
+    label: 'Best coverage reached',
+    group: 'coverage',
+    kind: 'numeric',
+    direction: 'higher'
+  }),
+
+  reachedFullCoverage: Object.freeze({
+    label: 'Reached full coverage',
+    group: 'coverage',
+    kind: 'binary',
+    direction: 'higher'
   }),
 
   gensToCoverageThreshold: Object.freeze({
     label: 'Generations to coverage threshold',
     group: 'coverage',
-    usesThresholdFraction: true
+    usesThresholdFraction: true,
+    kind: 'numeric',
+    direction: 'lower',
+    censoredAtRunBudgetPlusOne: true
   }),
 
-  aucCoverageNorm: Object.freeze({
-    label: 'Normalized coverage AUC',
-    group: 'coverage'
+  firstFullCoverageGeneration: Object.freeze({
+    label: 'Generations to full coverage',
+    group: 'coverage',
+    kind: 'numeric',
+    direction: 'lower',
+    censoredAtRunBudgetPlusOne: true
   }),
 
-  finalArea: Object.freeze({
-    label: 'Final area',
-    group: 'area'
+  areaAtFirstFullCoverage: Object.freeze({
+    label: 'Area at first full coverage',
+    group: 'area',
+    kind: 'numeric',
+    direction: 'lower',
+    conditionalOnFullCoverage: true
   }),
 
-  refinementTime: Object.freeze({
-    label: 'Area refinement time',
-    group: 'area'
+  bestFullCoverageArea: Object.freeze({
+    label: 'Best full-coverage area',
+    group: 'area',
+    kind: 'numeric',
+    direction: 'lower',
+    conditionalOnFullCoverage: true
+  }),
+
+  areaReductionAfterFullCoverage: Object.freeze({
+    label: 'Area reduction after full coverage',
+    group: 'area',
+    kind: 'numeric',
+    direction: 'higher',
+    conditionalOnFullCoverage: true
   }),
 
   diversityHalfLife: Object.freeze({
-    label: 'Diversity half-life',
-    group: 'diversity'
+    label: 'Generations to 50% diversity',
+    group: 'diversity',
+    kind: 'numeric',
+    direction: 'diagnostic',
+    censoredAtRunBudgetPlusOne: true
   }),
 
   diversityFinalInitialRatio: Object.freeze({
     label: 'Diversity final / initial ratio',
-    group: 'diversity'
-  }),
-
-  aucDiversityNorm: Object.freeze({
-    label: 'Normalized diversity AUC',
-    group: 'diversity'
-  }),
-
-  reachedFullCoverage: Object.freeze({
-    label: 'Success rate',
-    group: 'coverage',
-    descriptiveOnly: true
+    group: 'diversity',
+    kind: 'numeric',
+    direction: 'diagnostic'
   })
 });
 
@@ -78,14 +106,18 @@ export const METRIC_KEYS = Object.freeze(
 );
 
 export const INFERENTIAL_METRIC_KEYS = Object.freeze(
+  Object.values(METRIC_DEFINITIONS).map(def => def.key)
+);
+
+export const NUMERIC_METRIC_KEYS = Object.freeze(
   Object.values(METRIC_DEFINITIONS)
-    .filter(def => !def.descriptiveOnly)
+    .filter(def => def.kind === 'numeric')
     .map(def => def.key)
 );
 
-export const DESCRIPTIVE_METRIC_KEYS = Object.freeze(
+export const BINARY_METRIC_KEYS = Object.freeze(
   Object.values(METRIC_DEFINITIONS)
-    .filter(def => def.descriptiveOnly)
+    .filter(def => def.kind === 'binary')
     .map(def => def.key)
 );
 

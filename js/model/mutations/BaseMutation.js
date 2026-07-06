@@ -1,28 +1,28 @@
 import { INDIVIDUAL_TYPES } from '../individuals/individualConfig.js';
 
 export class BaseMutation {
-  constructor(type, params = {}, rng = null) {
+  constructor(params = {}, rng = null) {
     if (new.target === BaseMutation) {
       throw new Error('BaseMutation is abstract');
     }
 
-    if (!type) {
-      throw new Error('BaseMutation requires a type');
+    if (new.target.TYPE === undefined) {
+      throw new Error(`${new.target.name} must define static TYPE`);
     }
 
-    this.type = type;
+    this.type = new.target.TYPE;
     this.params = { ...params };
     this.rng = rng ?? Math;
-
-    const mutationRate = this.params.mutationRate;
-    if (!Number.isFinite(mutationRate) || mutationRate < 0 || mutationRate > 1) {
-      throw new Error(`${this.type} requires a valid mutationRate in [0, 1]`);
-    }
   }
 
   apply(individual, context = {}) {
     if (individual.type === INDIVIDUAL_TYPES.CARTESIAN) {
       this.applyCartesian(individual, context);
+      return;
+    }
+
+    if (individual.type === INDIVIDUAL_TYPES.CENTER_RELATIVE_CARTESIAN) {
+      this.applyCenterRelativeCartesian(individual, context);
       return;
     }
 
@@ -36,11 +36,15 @@ export class BaseMutation {
       return;
     }
 
-    throw new Error(`Unknown individual type: ${individual.type}`);
+    throw new TypeError(`Unsupported individual type: ${individual.type}`);
   }
 
   applyCartesian(ind, context = {}) {
     throw new Error(`${this.type} must implement applyCartesian(ind, context)`);
+  }
+
+  applyCenterRelativeCartesian(ind, context = {}) {
+    throw new Error(`${this.type} must implement applyCenterRelativeCartesian(ind, context)`);
   }
 
   applyPolarVariableCenter(ind, context = {}) {

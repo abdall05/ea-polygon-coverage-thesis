@@ -60,8 +60,19 @@ export function drawAreaGraph(containerId, history) {
     renderChart(container, traces, layout);
 }
 
+function hasDiversityData(history) {
+    return Array.isArray(history)
+        && history.length > 0
+        && Object.hasOwn(history[0], 'diversity');
+}
+
 export function drawDiversityGraph(containerId, history) {
     const container = getContainer(containerId);
+    if (!container || !hasDiversityData(history)) {
+        if (container) purgePlot(container);
+        return;
+    }
+
     const x = getGenerationAxis(history);
 
     const traces = [
@@ -103,6 +114,7 @@ export function drawExpandedGraph(plotDiv, graphKey, history, pointCount) {
         ];
         layout = getDefaultLayout('Area Convergence', 'Generation', 'Polygon Area', true);
     } else if (graphKey === 'diversity') {
+        if (!hasDiversityData(history)) return;
         traces = [
             makeLineTrace(x, history.map(g => g.diversity), 'Diversity', '#9b59b6')
         ];

@@ -6,6 +6,7 @@ export const CROSSOVER_TYPES = Object.freeze({
   FLAT: 'flat',
   UNIFORM: 'uniform'
 });
+
 export const DEFAULT_CROSSOVER_TYPE = CROSSOVER_TYPES.NONE;
 
 export const crossoverCommonParams = Object.freeze({
@@ -29,10 +30,10 @@ export const crossoverRegistry = Object.freeze({
     uniqueParams: Object.freeze({
       distributionIndex: Object.freeze({
         label: 'Distribution Index',
-        default: 5,
-        min: 0.1,
-        max: 100,
-        step: 0.1
+        default: 20,
+        min: 1,
+        max: 50,
+        step: 1
       })
     })
   }),
@@ -44,7 +45,7 @@ export const crossoverRegistry = Object.freeze({
         label: 'Alpha',
         default: 0.5,
         min: 0,
-        max: 2,
+        max: 1,
         step: 0.05
       })
     })

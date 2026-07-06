@@ -48,14 +48,15 @@ import {
 import {
     experimentFieldConfig,
     DEFAULT_EXPERIMENT_CONFIG
-} from '../../model/experimentConfig.js';
+} from './experimentConfig.js';
 
 import {
     paramsToDefaults,
     parseIntInput,
     parseFloatInput,
     renderOptions,
-    renderParamInputs
+    renderParamInputs,
+    validateNumberInputsBeforeAction
 } from '../../utils/configUiHelpers.js';
 
 const createDefaultState = () => {
@@ -270,9 +271,9 @@ export class SingleConfigExperiment {
                                 <label for="sc-rep-type">${representationFieldConfig.type.label}</label>
                                 <select id="sc-rep-type">
                                     ${renderOptions(
-                                        representationFieldConfig.type.options,
-                                        this.state.representation.type
-                                    )}
+            representationFieldConfig.type.options,
+            this.state.representation.type
+        )}
                                 </select>
                             </div>
 
@@ -340,7 +341,9 @@ export class SingleConfigExperiment {
 
             <div class="exp-actions" aria-label="Experiment actions">
                 <button id="runExpBtn" class="primary" type="button">Run experiment</button>
-                <button id="clearExpBtn" class="secondary" type="button">Reset</button>
+                <button id="clearExpBtn" class="secondary" type="button" disabled>
+    Clear Results
+</button>
                 <button id="exportExpBtn" class="secondary" type="button" disabled>
                     Export CSV
                 </button>
@@ -476,6 +479,14 @@ export class SingleConfigExperiment {
             ${createExperimentModal()}
         </section>
     `;
+    }
+
+    _setClearButtonState({ disabled, text }) {
+        const clearBtn = document.getElementById('clearExpBtn');
+        if (!clearBtn) return;
+
+        clearBtn.disabled = disabled;
+        clearBtn.textContent = text;
     }
 
     _createGraphItem(containerId, title) {
@@ -643,6 +654,17 @@ export class SingleConfigExperiment {
 
         switch (id) {
             case 'runExpBtn':
+                if (!validateNumberInputsBeforeAction(
+                    this.container,
+                    input => this._handleChange({ target: input }),
+                    {
+                        selector: '.single-config-experiment input[type="number"]:not(:disabled)',
+                        message: 'Some invalid inputs were reset to their default values. Please review them and click Run experiment again.'
+                    }
+                )) {
+                    return;
+                }
+
                 this._runExperiments();
                 break;
             case 'clearExpBtn':
@@ -867,7 +889,12 @@ export class SingleConfigExperiment {
         const resultsPanel = document.getElementById('expResultsPanel');
 
         runBtn.disabled = true;
-        clearBtn.disabled = true;
+
+        this._setClearButtonState({
+            disabled: false,
+            text: 'Stop Run'
+        });
+
         if (exportBtn) exportBtn.disabled = true;
         progressSection.style.display = 'block';
         resultsPanel.style.display = 'none';
@@ -878,7 +905,9 @@ export class SingleConfigExperiment {
         document.getElementById('expProgressFill').style.width = '0%';
 
         if (this.state.worker) this.state.worker.terminate();
-        this.state.worker = new Worker('./js/workers/evolutionWorker.js', { type: 'module' });
+        this.state.worker = new Worker(new URL('../../workers/evolutionWorker.js', import.meta.url), {
+            type: 'module'
+        });
         this.state.worker.onmessage = (e) => this._handleWorkerMessage(e);
 
         const evolutionParams = {
@@ -901,17 +930,17 @@ export class SingleConfigExperiment {
             nVertices: this.state.representation.nVertices
         };
 
-        const loggingOptions = {
+        const resultConfig = {
             storePopulation: false,
             includeAvgFitness: false,
-            diversity: 'none',
+            includeDiversity: false,
             lineageTracking: false
         };
 
         this.state.worker.postMessage({
             evolutionParams,
             points: this.state.points,
-            loggingOptions,
+            resultConfig,
             numRuns: totalRuns,
             seed: this.state.experiment.seed
         });
@@ -947,7 +976,12 @@ export class SingleConfigExperiment {
             const progressSection = document.getElementById('expProgressSection');
 
             if (runBtn) runBtn.disabled = false;
-            if (clearBtn) clearBtn.disabled = false;
+
+            this._setClearButtonState({
+                disabled: this.state.runResults.length === 0,
+                text: 'Clear Results'
+            });
+
             if (exportBtn) exportBtn.disabled = this.state.runResults.length === 0;
             if (progressSection) progressSection.style.display = 'none';
         } else if (data.type === 'error') {
@@ -1209,8 +1243,10 @@ export class SingleConfigExperiment {
         const runBtn = document.getElementById('runExpBtn');
         if (runBtn) runBtn.disabled = false;
 
-        const clearBtn = document.getElementById('clearExpBtn');
-        if (clearBtn) clearBtn.disabled = false;
+        this._setClearButtonState({
+            disabled: true,
+            text: 'Clear Results'
+        });
 
         const exportBtn = document.getElementById('exportExpBtn');
         if (exportBtn) exportBtn.disabled = true;

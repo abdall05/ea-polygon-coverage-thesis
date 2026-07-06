@@ -1,4 +1,5 @@
 import { PointSetGenerator } from '../model/points/PointSetGenerator.js';
+import { createRNG } from '../utils/rng.js';
 import {
     drawStandardScene,
     drawFittedScene
@@ -10,6 +11,11 @@ import {
     drawExpandedGraph,
     purgePlot
 } from '../rendering/charts.js';
+
+import {
+    seedFieldConfig,
+    DEFAULT_SEED_CONFIG
+} from './experimentModes/experimentConfig.js';
 
 import {
     representationFieldConfig,
@@ -50,7 +56,8 @@ import {
     parseIntInput,
     parseFloatInput,
     renderOptions,
-    renderParamInputs
+    renderParamInputs,
+    validateNumberInputsBeforeAction
 } from '../utils/configUiHelpers.js';
 
 /* ────────────────────────────────────────────
@@ -84,10 +91,16 @@ const createDefaultState = () => {
             type: POINT_DISTRIBUTION_TYPES.UNIFORM,
             params: paramsToDefaults(pointDistDef?.params)
         },
+        pointSeed: {
+            enabled: DEFAULT_SEED_CONFIG.enabled,
+            value: DEFAULT_SEED_CONFIG.value
+        },
         evolution: {
             populationSize: DEFAULT_EVOLUTION_CONFIG.populationSize,
             maxGenerations: DEFAULT_EVOLUTION_CONFIG.maxGenerations,
-            elitismCount: DEFAULT_EVOLUTION_CONFIG.elitismCount
+            elitismCount: DEFAULT_EVOLUTION_CONFIG.elitismCount,
+            includeDiversity: false
+
         },
         points: null,
         history: null,
@@ -167,22 +180,42 @@ export class ExplorerMode {
 
   <aside class="config-panel" aria-label="Configuration">
     <section class="config-section">
-      <h3>Point Set</h3>
-      <div class="param-row">
+    <h3>Point Set</h3>
+    <div class="param-row">
         <label for="im-pointDist-type">Distribution</label>
         <select id="im-pointDist-type">
-          ${renderOptions(getPointDistributionTypes(), this.state.pointDistribution.type)}
+        ${renderOptions(getPointDistributionTypes(), this.state.pointDistribution.type)}
         </select>
-      </div>
-      <div id="im-pointDist-params"></div>
+    </div>
+    <div id="im-pointDist-params"></div>
 
-      <div class="preview-container">
+    <div class="param-row checkbox-row">
+        <input
+        id="im-pointSeed-enabled"
+        type="checkbox"
+        ${this.state.pointSeed.enabled ? 'checked' : ''}
+        >
+        <label for="im-pointSeed-enabled">Use fixed seed</label>
+    </div>
+
+    <div class="param-row">
+        <label for="im-pointSeed-value">Seed</label>
+<input
+id="im-pointSeed-value"
+type="number"
+min="${seedFieldConfig.value.min}"
+step="${seedFieldConfig.value.step}"
+value="${this.state.pointSeed.value}"
+${this.state.pointSeed.enabled ? '' : 'disabled'}
+>    </div>
+
+    <div class="preview-container">
         <div class="preview-label">Point Set Preview</div>
         <canvas id="previewCanvas" width="400" height="400" class="preview-canvas"></canvas>
         <div class="preview-actions">
-          <button id="refreshPointsBtn" class="refresh-btn" type="button">Refresh Points</button>
+        <button id="refreshPointsBtn" class="refresh-btn" type="button">Generate Points</button>
         </div>
-      </div>
+    </div>
     </section>
 
     <section class="config-section">
@@ -240,10 +273,20 @@ export class ExplorerMode {
     </section>
 
     <section id="im-evolution-params" class="config-section"></section>
-
+    
+        <div class="run-options">
+  <div class="param-row checkbox-row">
+    <input
+      id="im-evo-includeDiversity"
+      type="checkbox"
+      ${this.state.evolution.includeDiversity ? 'checked' : ''}
+    >
+    <label for="im-evo-includeDiversity">Include diversity</label>
+  </div>
+</div>
     <div class="action-buttons">
       <button id="runBtn" class="primary" type="button">Run Evolution</button>
-      <button id="clearBtn" class="secondary" type="button">Reset View</button>
+      <button id="clearBtn" class="secondary" type="button" disabled>Clear Results</button>
     </div>
   </aside>
 
@@ -425,6 +468,30 @@ export class ExplorerMode {
                 this.state.pointDistribution.type = e.target.value;
                 this._onPointDistChanged();
                 break;
+            case 'im-pointSeed-enabled':
+                this.state.pointSeed.enabled = !!e.target.checked;
+
+                {
+                    const seedInput = this.container.querySelector('#im-pointSeed-value');
+                    if (seedInput) seedInput.disabled = !this.state.pointSeed.enabled;
+                }
+
+                this._updatePoints(true);
+                this._drawPreview();
+                break;
+
+            case 'im-pointSeed-value':
+                this.state.pointSeed.value = parseIntInput(
+                    e.target,
+                    seedFieldConfig.value.default,
+                    seedFieldConfig.value
+                );
+
+                if (this.state.pointSeed.enabled) {
+                    this._updatePoints(true);
+                    this._drawPreview();
+                }
+                break;
 
             case 'im-rep-type':
                 this.state.representation.type = e.target.value;
@@ -452,6 +519,9 @@ export class ExplorerMode {
             case 'im-selection-type':
                 this.state.selection.type = e.target.value;
                 this._onSelectionChanged();
+                break;
+            case 'im-evo-includeDiversity':
+                this.state.evolution.includeDiversity = !!e.target.checked;
                 break;
 
             default:
@@ -532,7 +602,13 @@ export class ExplorerMode {
                 break;
         }
     }
+    _setClearButtonState({ disabled, text }) {
+        const clearBtn = document.getElementById('clearBtn');
+        if (!clearBtn) return;
 
+        clearBtn.disabled = disabled;
+        clearBtn.textContent = text;
+    }
     _handleClick(e) {
         const id = e.target.id;
 
@@ -542,6 +618,16 @@ export class ExplorerMode {
                 this._drawPreview();
                 break;
             case 'runBtn':
+                if (!validateNumberInputsBeforeAction(
+                    this.container,
+                    input => this._handleChange({ target: input }),
+                    {
+                        selector: '.config-panel input[type="number"]:not(:disabled)'
+                    }
+                )) {
+                    return;
+                }
+
                 this._runEvolution();
                 break;
             case 'clearBtn':
@@ -711,7 +797,9 @@ export class ExplorerMode {
           step="${cfg.elitismCount.step}"
           value="${state.elitismCount}"
         >
-      </div>`;
+      </div>
+
+      `;
     }
 
     /* ---------- UI sync ---------- */
@@ -762,10 +850,13 @@ export class ExplorerMode {
         const safeCount = parseInt(params.count, 10) || 100;
         const safeParams = { ...params, count: safeCount };
 
-        this.state.points = PointSetGenerator.generate(type, safeParams, Math);
+        const rng = this.state.pointSeed.enabled
+            ? createRNG(this.state.pointSeed.value)
+            : Math;
+
+        this.state.points = PointSetGenerator.generate(type, safeParams, rng);
         this._drawPreview();
     }
-
     _drawPreview() {
         const canvas = this._dom.previewCanvas;
         if (!canvas || !this.state.points) return;
@@ -784,6 +875,11 @@ export class ExplorerMode {
 
         this._clear();
         this.state.isRunning = true;
+        document.getElementById('runBtn').disabled = true;
+
+        const clearBtn = document.getElementById('clearBtn');
+        clearBtn.disabled = false;
+        clearBtn.textContent = 'Stop Run';
         this.state.runPoints = this.state.points.slice();
         this.state.currentGen = 0;
         this.state.currentRank = 0;
@@ -792,7 +888,10 @@ export class ExplorerMode {
         document.getElementById('progressSection').style.display = 'block';
         document.getElementById('emptyHelper').style.display = 'none';
         document.getElementById('runBtn').disabled = true;
-        document.getElementById('clearBtn').disabled = false;
+        this._setClearButtonState({
+            disabled: false,
+            text: 'Stop Run'
+        });
 
 
 
@@ -816,21 +915,24 @@ export class ExplorerMode {
             nVertices: this.state.representation.nVertices
         };
 
-        const loggingOptions = {
+        const resultConfig = {
             storePopulation: true,
             includeAvgFitness: true,
-            diversity: 'per-generation',
+            includeDiversity: !!this.state.evolution.includeDiversity,
             lineageTracking: true
         };
 
-        const worker = new Worker('./js/workers/evolutionWorker.js', { type: 'module' });
+        const worker = new Worker(
+            new URL('../workers/evolutionWorker.js', import.meta.url),
+            { type: 'module' }
+        );
         this.state.worker = worker;
         worker.onmessage = (e) => this._handleWorkerMessage(e);
 
         worker.postMessage({
             evolutionParams,
             points: this.state.points,
-            loggingOptions,
+            resultConfig,
             updateInterval: 10,
             numRuns: 1,
             seed: undefined
@@ -865,7 +967,6 @@ export class ExplorerMode {
             this._finishWorkerRun();
         }
     }
-
     _finishWorkerRun() {
         if (this.state.worker) {
             this.state.worker.terminate();
@@ -873,9 +974,14 @@ export class ExplorerMode {
         }
 
         this.state.isRunning = false;
+
         document.getElementById('runBtn').disabled = false;
-        document.getElementById('clearBtn').disabled = false;
         document.getElementById('progressSection').style.display = 'none';
+
+        this._setClearButtonState({
+            disabled: !(this.state.history && this.state.history.length > 0),
+            text: 'Clear Results'
+        });
     }
 
     /* ---------- Results rendering ---------- */
@@ -889,9 +995,11 @@ export class ExplorerMode {
         document.getElementById('graphsContainer').style.display = 'block';
         document.getElementById('emptyHelper').style.display = 'none';
 
+        const finalGenerationIndex = history.length - 1;
+
         const genSlider = document.getElementById('genSlider');
-        genSlider.max = history.length - 1;
-        genSlider.value = 0;
+        genSlider.max = finalGenerationIndex;
+        genSlider.value = finalGenerationIndex;
         genSlider.disabled = false;
         genSlider.oninput = () => {
             this.state.currentGen = parseInt(genSlider.value, 10);
@@ -905,6 +1013,7 @@ export class ExplorerMode {
         popSlider.disabled = false;
         popSlider.oninput = () => {
             this.state.currentRank = parseInt(popSlider.value, 10);
+
             document.getElementById('rankDisplay').innerText =
                 this.state.currentRank === 0
                     ? 'Best'
@@ -917,24 +1026,50 @@ export class ExplorerMode {
             this._updateFromRank();
         };
 
-        this.state.currentGen = 0;
+        this.state.currentGen = finalGenerationIndex;
         this.state.currentRank = 0;
+
         document.getElementById('rankDisplay').innerText = 'Best';
 
-        this._updateFromGeneration();
-        this._updateFromRank();
+        this._updateGenDisplay();
+        this._drawMainCanvas();
+
+        const hasDiversity = this._hasDiversityData();
+        const diversityGraph = document.getElementById('diversityGraph');
+        const diversityGraphItem = diversityGraph?.closest('.graph-item');
+        const diversityMetric = document.getElementById('diversityValue')?.closest('.diversity-metric');
+        const diversityExpandBtn = diversityGraphItem?.querySelector('.expand-graph-btn');
 
         drawCoverageGraph(
             'coverageGraph',
             history,
             this.state.pointDistribution.params.count ?? 100
         );
-        drawAreaGraph('areaGraph', history);
-        drawDiversityGraph('diversityGraph', history);
 
-        document.querySelectorAll('.expand-graph-btn').forEach(btn => {
+        drawAreaGraph('areaGraph', history);
+
+        if (hasDiversity) {
+            if (diversityGraphItem) diversityGraphItem.style.display = 'block';
+            if (diversityMetric) diversityMetric.style.display = 'flex';
+            if (diversityExpandBtn) diversityExpandBtn.disabled = false;
+
+            drawDiversityGraph('diversityGraph', history);
+        } else {
+            if (diversityGraphItem) diversityGraphItem.style.display = 'none';
+            if (diversityMetric) diversityMetric.style.display = 'none';
+            if (diversityExpandBtn) diversityExpandBtn.disabled = true;
+            if (diversityGraph) purgePlot(diversityGraph);
+        }
+
+        this.container.querySelectorAll('.expand-graph-btn').forEach(btn => {
             btn.onclick = () => this._openExplorerGraphModal(btn.dataset.graph);
         });
+    }
+    _hasDiversityData() {
+        const history = this.state.history;
+        return Array.isArray(history)
+            && history.length > 0
+            && Object.prototype.hasOwnProperty.call(history[0], 'diversity');
     }
 
     _updateGenDisplay() {
@@ -1322,7 +1457,6 @@ export class ExplorerMode {
         document.getElementById('emptyHelper').style.display = 'block';
         document.getElementById('progressSection').style.display = 'none';
         document.getElementById('runBtn').disabled = false;
-        document.getElementById('clearBtn').disabled = false;
         document.getElementById('currentGen').textContent = '0';
         document.getElementById('progressFill').style.width = '0%';
 
@@ -1338,6 +1472,16 @@ export class ExplorerMode {
             popSlider.disabled = true;
         }
 
+        ['coverageGraph', 'areaGraph', 'diversityGraph', 'graphModalPlot'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) purgePlot(el);
+        });
+
+        this._setClearButtonState({
+            disabled: true,
+            text: 'Clear Results'
+        });
+
         document.getElementById('rankDisplay').innerText = 'Best';
         document.getElementById('browserStats').innerHTML = '';
         document.getElementById('diversityValue').innerText = '0.000';
@@ -1350,6 +1494,10 @@ export class ExplorerMode {
 
     destroy() {
         if (this.state.worker) this.state.worker.terminate();
+
+        this.container.removeEventListener('change', this._boundChangeHandler);
+        this.container.removeEventListener('click', this._boundClickHandler);
+
         this.container.innerHTML = '';
     }
 }

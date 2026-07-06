@@ -1,18 +1,16 @@
 export class BaseCrossover {
-  type = 'base-crossover';
-
   constructor(params = {}, rng = null) {
     if (new.target === BaseCrossover) {
-      throw new Error('BaseCrossover is abstract');
+      throw new TypeError('BaseCrossover is abstract');
     }
 
+    if (new.target.TYPE === undefined) {
+      throw new TypeError(`${new.target.name} must define static TYPE`);
+    }
+
+    this.type = new.target.TYPE;
     this.params = { ...params };
     this.rng = rng ?? Math;
-
-    const crossoverRate = this.params.crossoverRate;
-    if (!Number.isFinite(crossoverRate) || crossoverRate < 0 || crossoverRate > 1) {
-      throw new Error(`${this.type} requires a valid crossoverRate in [0, 1]`);
-    }
   }
 
   apply(p1, p2) {
@@ -27,6 +25,6 @@ export class BaseCrossover {
   }
 
   crossoverGenomes(c1, c2) {
-    throw new Error(`${this.type} must implement crossoverGenomes(c1, c2)`);
+    throw new TypeError(`${this.type} must implement crossoverGenomes(c1, c2)`);
   }
 }

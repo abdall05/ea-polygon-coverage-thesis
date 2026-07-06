@@ -16,15 +16,22 @@ export function renderOptions(options = [], selectedValue = null) {
 }
 
 function normalizeNumber(value, meta, { integer = false } = {}) {
-  const parsed = integer
-    ? Number.parseInt(value, 10)
-    : Number.parseFloat(value);
+  const raw = String(value ?? '').trim();
+  const parsed = Number(raw);
 
-  if (!Number.isFinite(parsed)) {
+  if (raw === '' || !Number.isFinite(parsed)) {
     return {
       valid: false,
       value: meta.default,
       message: `${meta.label} is invalid. Reset to default ${meta.default}.`
+    };
+  }
+
+  if (integer && !Number.isInteger(parsed)) {
+    return {
+      valid: false,
+      value: meta.default,
+      message: `${meta.label} must be an integer. Reset to default ${meta.default}.`
     };
   }
 
@@ -77,21 +84,28 @@ function applyInputValidationResult(input, result) {
   if (!result.valid) {
     showFieldError(input, result.message);
     input.value = String(result.value);
+    input.dataset.correctedToDefault = 'true';
     input.setCustomValidity('');
     return result.value;
   }
 
   clearFieldError(input);
   input.value = String(result.value);
+  input.dataset.correctedToDefault = 'false';
   input.setCustomValidity('');
   return result.value;
 }
 
 export function parseIntInput(input, fallback = 0, meta = null) {
-  const cfg = meta ?? {
+  const cfg = {
     label: 'Value',
-    default: fallback
+    default: fallback,
+    ...(meta ?? {})
   };
+
+  if (cfg.default === undefined) {
+    cfg.default = fallback;
+  }
 
   return applyInputValidationResult(
     input,
@@ -100,15 +114,63 @@ export function parseIntInput(input, fallback = 0, meta = null) {
 }
 
 export function parseFloatInput(input, fallback = 0, meta = null) {
-  const cfg = meta ?? {
+  const cfg = {
     label: 'Value',
-    default: fallback
+    default: fallback,
+    ...(meta ?? {})
   };
+
+  if (cfg.default === undefined) {
+    cfg.default = fallback;
+  }
 
   return applyInputValidationResult(
     input,
     normalizeNumber(input.value, cfg, { integer: false })
   );
+}
+
+export function validateNumberInputsBeforeAction(
+  root,
+  syncInput,
+  {
+    selector = 'input[type="number"]:not(:disabled)',
+    message = 'Some invalid inputs were reset to their default values. Please review them and click Run again.'
+  } = {}
+) {
+  const correctedInputs = [];
+
+  const numberInputs = root.querySelectorAll(selector);
+
+  numberInputs.forEach(input => {
+    // Important: if the change event already corrected this input,
+    // do not erase that information.
+    if (input.dataset.correctedToDefault === 'true') {
+      correctedInputs.push(input);
+      return;
+    }
+
+    syncInput(input);
+
+    if (input.dataset.correctedToDefault === 'true') {
+      correctedInputs.push(input);
+    }
+  });
+
+  if (correctedInputs.length > 0) {
+    alert(message);
+
+    // Mark as reviewed so the next Run click can continue
+    // after the user has seen the corrected values.
+    correctedInputs.forEach(input => {
+      input.dataset.correctedToDefault = 'reviewed';
+    });
+
+    correctedInputs[0]?.focus();
+    return false;
+  }
+
+  return true;
 }
 
 export function renderParamInputs(container, definition, values, idPrefix) {

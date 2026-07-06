@@ -1,30 +1,15 @@
-import { Selection } from "./Selection.js";
+import { BaseSelection } from "./BaseSelection.js";
 import { SELECTION_TYPES } from "./selectionConfig.js";
 
-export class RankSelection extends Selection {
-  type = SELECTION_TYPES.RANK;
+export class RankSelection extends BaseSelection {
+  static TYPE = SELECTION_TYPES.RANK;
 
   constructor(params = {}, rng = null) {
     super(params, rng);
-
-    const selectivePressure = this.params.selectivePressure;
-
-    if (
-      !Number.isFinite(selectivePressure) ||
-      selectivePressure < 1 ||
-      selectivePressure > 2
-    ) {
-      throw new Error(`${this.type} requires selectivePressure in [1, 2]`);
-    }
-
-    this.selectivePressure = selectivePressure;
+    this.selectivePressure = this.params.selectivePressure;
   }
 
-  select(population, compareFitness) {
-    if (!Array.isArray(population) || population.length === 0) {
-      throw new Error(`${this.type} requires a non-empty population`);
-    }
-
+  select(population) {
     const n = population.length;
 
     if (n === 1) {

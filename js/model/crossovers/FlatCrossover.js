@@ -2,15 +2,11 @@ import { BaseCrossover } from './BaseCrossover.js';
 import { CROSSOVER_TYPES } from './crossoverConfig.js';
 
 export class FlatCrossover extends BaseCrossover {
-  type = CROSSOVER_TYPES.FLAT;
+  static TYPE = CROSSOVER_TYPES.FLAT;
 
   crossoverGenomes(c1, c2) {
     const g1 = c1.genome;
     const g2 = c2.genome;
-
-    if (g1.length !== g2.length) {
-      throw new Error(`${this.type}: genome lengths differ`);
-    }
 
     for (let i = 0; i < g1.length; i++) {
       const x1 = g1[i];

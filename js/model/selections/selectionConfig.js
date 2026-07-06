@@ -27,12 +27,12 @@ const rankParams = Object.freeze({
 });
 
 const truncationParams = Object.freeze({
-  truncationSize: Object.freeze({
-    label: 'Truncation Size',
+  selectedFraction: Object.freeze({
+    label: 'Selected Fraction',
     default: 0.5,
-    min: 0.01,
+    min: 0.05,
     max: 1,
-    step: 0.01
+    step: 0.05
   })
 });
 

@@ -8,7 +8,7 @@ export class EvolutionEngine {
     resultConfig,
     problemConfig,
     operators,
-    rngs = {}
+    initializationRng = null
   ) {
     if (!engineConfig) {
       throw new Error("EvolutionEngine requires engineConfig");
@@ -46,8 +46,8 @@ export class EvolutionEngine {
     this.crossoverOp = operators.crossoverOp ?? null;
     this.fitnessEvaluator = operators.fitnessEvaluator;
     this.selectionOp = operators.selectionOp;
-    this.initRng = rngs.initialization ?? null;
 
+    this.initializationRng = initializationRng;
     this.history = [];
   }
 
@@ -105,7 +105,7 @@ export class EvolutionEngine {
       const ind = IndividualFactory.create(
         representationType,
         nVertices,
-        this.initRng
+        this.initializationRng
       );
 
       if (this.isLineageEnabled()) {
@@ -140,21 +140,11 @@ export class EvolutionEngine {
     );
   }
 
-  buildMutationContext(generation, population = null) {
-    const context = {
+  buildMutationContext(generation) {
+    return {
       currentGeneration: generation,
       maxGenerations: this.engineConfig.maxGenerations
     };
-
-    if (population && population.length > 0) {
-      context.bestFitness = { ...population[0].fitness };
-
-      if (this.resultConfig.includeAvgFitness) {
-        context.avgFitness = PopulationMetrics.averageFitness(population);
-      }
-    }
-
-    return context;
   }
 
   mutate(individual, context = {}) {
@@ -178,8 +168,12 @@ export class EvolutionEngine {
     if (!this.crossoverOp) {
       c1 = parent1.clone();
       c2 = parent2.clone();
+      c1.lineageRef = null;
+      c2.lineageRef = null;
     } else {
       [c1, c2] = this.crossoverOp.apply(parent1, parent2);
+      c1.lineageRef = null;
+      c2.lineageRef = null;
     }
 
     if (this.isLineageEnabled()) {
@@ -212,14 +206,8 @@ export class EvolutionEngine {
     child.repair({ clamp: true });
   }
 
-  shouldIncludeDiversity(gen) {
-    return (
-      this.resultConfig.diversity === "per-generation" ||
-      (
-        this.resultConfig.diversity === "final-only" &&
-        gen === this.engineConfig.maxGenerations
-      )
-    );
+  shouldIncludeDiversity() {
+    return !!this.resultConfig.includeDiversity;
   }
 
   buildStoredIndividual(ind) {
@@ -247,7 +235,7 @@ export class EvolutionEngine {
       entry.avgFitness = PopulationMetrics.averageFitness(sortedPopulation);
     }
 
-    if (this.shouldIncludeDiversity(gen)) {
+    if (this.shouldIncludeDiversity()) {
       entry.diversity = PopulationMetrics.diversity(sortedPopulation);
     }
 
@@ -276,6 +264,7 @@ export class EvolutionEngine {
 
     const elites = sortedPopulation.slice(0, eliteCount).map(parent => {
       const clone = parent.clone();
+      clone.lineageRef = null;
       if (this.isLineageEnabled()) {
         clone.lineage = {
           state: "elite",
@@ -286,7 +275,7 @@ export class EvolutionEngine {
     });
 
     const nextPopulation = [...elites];
-    const mutationContext = this.buildMutationContext(generation, sortedPopulation);
+    const mutationContext = this.buildMutationContext(generation);
 
     while (nextPopulation.length < P) {
       const p1 = this.selectParent(sortedPopulation);
@@ -300,8 +289,14 @@ export class EvolutionEngine {
       this.repairOffspring(c1);
       this.repairOffspring(c2);
 
-      nextPopulation.push(c1);
-      if (nextPopulation.length < P) {
+      // Collinear offspring are rare, but if they occur,
+      // they are discarded and the loop continues.
+
+      if (c1.isValid()) {
+        nextPopulation.push(c1);
+      }
+
+      if (nextPopulation.length < P && c2.isValid()) {
         nextPopulation.push(c2);
       }
     }

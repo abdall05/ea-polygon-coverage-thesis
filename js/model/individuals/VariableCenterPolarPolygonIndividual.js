@@ -2,12 +2,11 @@ import { BasePolygonIndividual } from './BasePolygonIndividual.js';
 import { PolygonGeometry } from '../geometry/PolygonGeometry.js';
 import { circularAngleDiff } from '../../utils/math.js';
 import { INDIVIDUAL_TYPES } from './individualConfig.js';
+import { GEOMETRY_CONFIG } from '../geometry/geometryConfig.js';
+
 
 export class VariableCenterPolarPolygonIndividual extends BasePolygonIndividual {
-  constructor(N, rng = null) {
-    super(INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER, N, rng);
-    this.genome = this.generateGenome();
-  }
+  static TYPE = INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER;
 
   generateGenome() {
     const { cx, cy, angles, radii } = PolygonGeometry.generateRandomPolygon(
@@ -23,7 +22,7 @@ export class VariableCenterPolarPolygonIndividual extends BasePolygonIndividual 
     return genome;
   }
 
-  decodePolygon() {
+  genomeToPoints() {
     const cx = this.genome[0];
     const cy = this.genome[1];
     const rawPoints = [];
@@ -38,18 +37,7 @@ export class VariableCenterPolarPolygonIndividual extends BasePolygonIndividual 
       });
     }
 
-    return PolygonGeometry.fixPolygonOrder(rawPoints);
-  }
-
-  clone() {
-    const copy = Object.create(VariableCenterPolarPolygonIndividual.prototype);
-    copy.N = this.N;
-    copy.type = this.type;
-    copy.genome = [...this.genome];
-    copy.fitness = { ...this.fitness };
-    copy.rng = this.rng;
-    copy.lineage = this.lineage;
-    return copy;
+    return rawPoints;
   }
 
   clampGenome() {
@@ -79,11 +67,22 @@ export class VariableCenterPolarPolygonIndividual extends BasePolygonIndividual 
       return 0;
     }
 
+    const min = GEOMETRY_CONFIG.WORLD_MIN;
+    const max = GEOMETRY_CONFIG.WORLD_MAX;
+    const range = max - min;
+    const diagonal = Math.hypot(range, range);
+
+    if (range <= 0 || diagonal <= 0) {
+      return 0;
+    }
+
     let sum = 0;
 
-    sum += Math.abs(this.genome[0] - other.genome[0]);
-    sum += Math.abs(this.genome[1] - other.genome[1]);
+    // Centre coordinates
+    sum += Math.abs(this.genome[0] - other.genome[0]) / range;
+    sum += Math.abs(this.genome[1] - other.genome[1]) / range;
 
+    // Angle-radius pairs
     for (let i = 2; i < this.genome.length; i += 2) {
       const thetaA = this.genome[i];
       const rA = this.genome[i + 1];
@@ -91,8 +90,11 @@ export class VariableCenterPolarPolygonIndividual extends BasePolygonIndividual 
       const thetaB = other.genome[i];
       const rB = other.genome[i + 1];
 
-      sum += circularAngleDiff(thetaA, thetaB) / Math.PI;
-      sum += Math.abs(rA - rB);
+      const angleDistance = circularAngleDiff(thetaA, thetaB) / Math.PI;
+      const radiusDistance = Math.abs(rA - rB) / diagonal;
+
+      sum += angleDistance;
+      sum += radiusDistance;
     }
 
     return sum / this.genome.length;

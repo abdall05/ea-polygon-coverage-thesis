@@ -1,4 +1,4 @@
-import { LocalityExperiment } from '../model/locality/LocalityExperiment';
+import { LocalityExperiment } from '../model/locality/LocalityExperiment.js';
 
 self.onmessage = (e) => {
   try {
@@ -14,11 +14,11 @@ self.onmessage = (e) => {
 
     const experiment = new LocalityExperiment({
       individualType: config.representation.type,
+      nVertices: config.representation.nVertices,
       mutationType: config.mutation.type,
       mutationParams: config.mutation.params,
-      nVertices: config.representation.nVertices,
+      seed: config.experiment.seed,
       sampleSize: config.experiment.sampleSize,
-      seed: config.experiment.seed
     });
 
     const result = experiment.run();

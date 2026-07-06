@@ -28,7 +28,7 @@ export class CrossoverFactory {
         return null;
 
       default:
-        throw new Error(`Unknown crossover type: ${type}`);
+        throw new TypeError(`Unknown crossover type: ${type}`);
     }
   }
 }

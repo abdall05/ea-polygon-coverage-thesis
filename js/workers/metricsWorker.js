@@ -1,29 +1,17 @@
 import {
-    computeRunMetrics,
     computeMetricsForResults,
-    filterMetrics
 } from '../model/metrics/runMetrics';
 
 self.onmessage = (e) => {
-    const { history, results, metricsConfig, outputConfig } = e.data;
+    const { results, metricsConfig, outputConfig } = e.data;
 
     try {
-        if (Array.isArray(results)) {
-            const processed = computeMetricsForResults(results, metricsConfig, outputConfig);
-            self.postMessage({ type: 'complete', results: processed });
-            return;
+        if (!Array.isArray(results)) {
+            throw new Error('metricsWorker requires results array');
         }
 
-        if (Array.isArray(history)) {
-            const metrics = computeRunMetrics(history, metricsConfig);
-            self.postMessage({
-                type: 'complete',
-                metrics: filterMetrics(metrics, outputConfig)
-            });
-            return;
-        }
-
-        throw new Error('metricsWorker requires history or results array');
+        const processed = computeMetricsForResults(results, metricsConfig, outputConfig);
+        self.postMessage({ type: 'complete', results: processed });
     } catch (err) {
         self.postMessage({
             type: 'error',

@@ -1,5 +1,6 @@
 export const INDIVIDUAL_TYPES = Object.freeze({
   CARTESIAN: 'cartesian',
+  CENTER_RELATIVE_CARTESIAN: 'center-relative-cartesian',
   POLAR_VARIABLE_CENTER: 'polar-variable-center',
   POLAR_FIXED_CENTER: 'polar-fixed-center'
 });
@@ -12,6 +13,10 @@ export const representationFieldConfig = Object.freeze({
       Object.freeze({
         value: INDIVIDUAL_TYPES.CARTESIAN,
         label: 'Cartesian'
+      }),
+      Object.freeze({
+        value: INDIVIDUAL_TYPES.CENTER_RELATIVE_CARTESIAN,
+        label: 'Centre-Relative Cartesian'
       }),
       Object.freeze({
         value: INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER,

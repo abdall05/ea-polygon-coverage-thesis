@@ -7,11 +7,10 @@ import { summarize } from '../../stats/statsUtils.js';
 export class LocalityExperiment {
   constructor({
     individualType,
+    nVertices,
     mutationType,
     mutationParams,
-    nVertices,
-    sampleSize,
-    seed
+    seed, sampleSize
   }) {
     if (!individualType) {
       throw new Error('LocalityExperiment requires individualType');
@@ -25,20 +24,14 @@ export class LocalityExperiment {
       throw new Error('LocalityExperiment requires mutationParams');
     }
 
-    if (!Number.isInteger(nVertices) || nVertices < 4) {
-      throw new Error('LocalityExperiment requires a valid nVertices');
-    }
-
-    if (!Number.isInteger(sampleSize) || sampleSize <= 0) {
-      throw new Error('LocalityExperiment requires a valid positive sampleSize');
-    }
 
     this.individualType = individualType;
+    this.nVertices = nVertices;
     this.mutationType = mutationType;
     this.mutationParams = mutationParams;
-    this.nVertices = nVertices;
-    this.sampleSize = sampleSize;
     this.seed = seed;
+    this.sampleSize = sampleSize;
+
   }
 
   run() {
@@ -74,11 +67,11 @@ export class LocalityExperiment {
     return {
       config: {
         individualType: this.individualType,
+        nVertices: this.nVertices,
         mutationType: this.mutationType,
         mutationParams: { ...this.mutationParams },
-        nVertices: this.nVertices,
+        seed: this.seed,
         sampleSize: this.sampleSize,
-        seed: this.seed
       },
       samples: {
         requestedSamples: this.sampleSize,

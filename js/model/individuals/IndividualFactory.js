@@ -1,13 +1,18 @@
 import { CartesianPolygonIndividual } from './CartesianPolygonIndividual.js';
+import { CenterRelativeCartesianPolygonIndividual } from './CenterRelativeCartesianPolygonIndividual.js';
 import { VariableCenterPolarPolygonIndividual } from './VariableCenterPolarPolygonIndividual.js';
 import { FixedCenterPolarPolygonIndividual } from './FixedCenterPolarPolygonIndividual.js';
 
 import { INDIVIDUAL_TYPES } from './individualConfig.js';
+
 export class IndividualFactory {
   static create(type, N, rng = null) {
     switch (type) {
       case INDIVIDUAL_TYPES.CARTESIAN:
         return new CartesianPolygonIndividual(N, rng);
+
+      case INDIVIDUAL_TYPES.CENTER_RELATIVE_CARTESIAN:
+        return new CenterRelativeCartesianPolygonIndividual(N, rng);
 
       case INDIVIDUAL_TYPES.POLAR_VARIABLE_CENTER:
         return new VariableCenterPolarPolygonIndividual(N, rng);

@@ -10,7 +10,8 @@ import {
   parseIntInput,
   parseFloatInput,
   renderOptions,
-  renderParamInputs
+  renderParamInputs,
+  validateNumberInputsBeforeAction
 } from '../../utils/configUiHelpers.js';
 
 export class ConfigLocalityExperiment {
@@ -157,6 +158,7 @@ export class ConfigLocalityExperiment {
                           type="number"
                           inputmode="numeric"
                           min="${seedField.min}"
+                          ${seedField.max !== undefined ? `max="${seedField.max}"` : ''}
                           step="${seedField.step}"
                           value="${this.state.experiment.seed}"
                         >
@@ -170,9 +172,9 @@ export class ConfigLocalityExperiment {
                     <span class="btn-label">Measure locality</span>
                   </button>
 
-                  <button id="clearLocalityBtn" class="secondary" type="button">
-                    Reset
-                  </button>
+<button id="clearLocalityBtn" class="secondary" type="button" disabled>
+  Clear Results
+</button>
                 </div>
               </div>
             </section>
@@ -182,9 +184,9 @@ export class ConfigLocalityExperiment {
         <section class="config-card locality-results-panel" aria-labelledby="locality-results-title" aria-live="polite">
           <header class="config-card-header">
             <div>
-              <h2 id="locality-results-title" class="config-card-title">Locality Results</h2>
+              <h2 id="locality-results-title" class="config-card-title">Distance Results</h2>
               <p class="config-card-subtitle">
-                Statistical summary of locality ratio, genotype distance, and phenotype distance.
+                Statistical summary of genotype and phenotype distances.
               </p>
             </div>
           </header>
@@ -221,18 +223,12 @@ export class ConfigLocalityExperiment {
                   <div>
                     <h3 id="locality-summary-title">Summary Tables</h3>
                     <p class="section-note">
-                      Locality is reported as \(dP / dG\), together with the underlying genotype and phenotype distance summaries.
+                        The tables report the underlying genotype and phenotype distance summaries.
                     </p>
                   </div>
                 </div>
 
                 <div class="locality-table-grid">
-                  <section class="locality-table-card" aria-labelledby="locality-ratio-title">
-                    <h3 id="locality-ratio-title">Locality Ratio</h3>
-                    <p class="section-note">Defined as phenotype distance divided by genotype distance.</p>
-                    <div id="localityRatioTable"></div>
-                  </section>
-
                   <section class="locality-table-card" aria-labelledby="locality-dg-title">
                     <h3 id="locality-dg-title">Genotype Distance (dG)</h3>
                     <p class="section-note">Distance measured in genotype space.</p>
@@ -272,7 +268,6 @@ export class ConfigLocalityExperiment {
       localityRequestedSamples: this.container.querySelector('#localityRequestedSamples'),
       localityValidSamples: this.container.querySelector('#localityValidSamples'),
       localitySkippedSamples: this.container.querySelector('#localitySkippedSamples'),
-      localityRatioTable: this.container.querySelector('#localityRatioTable'),
       localityDGTable: this.container.querySelector('#localityDGTable'),
       localityDPTable: this.container.querySelector('#localityDPTable')
     };
@@ -376,19 +371,42 @@ export class ConfigLocalityExperiment {
     }
   }
   _handleClick(e) {
-    if (e.target.closest('#measureLocalityBtn')) this.measureLocality();
-    if (e.target.closest('#clearLocalityBtn')) this.clear();
+    if (e.target.closest('#measureLocalityBtn')) {
+      if (!validateNumberInputsBeforeAction(
+        this.container,
+        input => this._handleChange({ target: input }),
+        {
+          selector: '.locality-experiment input[type="number"]:not(:disabled)',
+          message: 'Some invalid inputs were reset to their default values. Please review them and click Measure locality again.'
+        }
+      )) {
+        return;
+      }
+
+      this.measureLocality();
+      return;
+    }
+
+    if (e.target.closest('#clearLocalityBtn')) {
+      this.clear();
+    }
   }
 
   setBusy(isBusy) {
     this.isRunning = isBusy;
 
-    if (this.refs.measureBtn) this.refs.measureBtn.disabled = isBusy;
-    if (this.refs.clearBtn) this.refs.clearBtn.disabled = isBusy;
+    if (this.refs.measureBtn) {
+      this.refs.measureBtn.disabled = isBusy;
+    }
 
     const label = this.refs.measureBtn?.querySelector('.btn-label');
     if (label) {
       label.textContent = isBusy ? 'Measuring…' : 'Measure locality';
+    }
+
+    if (this.refs.clearBtn) {
+      this.refs.clearBtn.disabled = isBusy ? false : !this.result;
+      this.refs.clearBtn.textContent = isBusy ? 'Stop Measurement' : 'Clear Results';
     }
   }
 
@@ -416,14 +434,34 @@ export class ConfigLocalityExperiment {
 
     this.result = null;
 
-    if (this.refs.localityRatioTable) this.refs.localityRatioTable.innerHTML = '';
     if (this.refs.localityDGTable) this.refs.localityDGTable.innerHTML = '';
     if (this.refs.localityDPTable) this.refs.localityDPTable.innerHTML = '';
 
     this.syncUI();
     this.setBusy(true);
 
-    this.localityWorker = new Worker('./js/workers/localityWorker.js', { type: 'module' });
+    this.localityWorker = new Worker(new URL('../../workers/localityWorker.js', import.meta.url), {
+      type: 'module'
+    });
+    this.localityWorker.onerror = (error) => {
+      console.error('Locality worker failed to load or crashed:', error);
+
+      this.localityWorker?.terminate();
+      this.localityWorker = null;
+      this.result = null;
+      this.syncUI();
+      this.setBusy(false);
+    };
+
+    this.localityWorker.onmessageerror = (error) => {
+      console.error('Locality worker message error:', error);
+
+      this.localityWorker?.terminate();
+      this.localityWorker = null;
+      this.result = null;
+      this.syncUI();
+      this.setBusy(false);
+    };
 
     this.localityWorker.onmessage = ({ data }) => {
       if (data.type === 'localityResult') {
@@ -456,6 +494,18 @@ export class ConfigLocalityExperiment {
 
   formatNumber(value, digits = 4) {
     if (!Number.isFinite(value)) return '—';
+
+    if (value === 0) {
+      return value.toFixed(digits);
+    }
+
+    const abs = Math.abs(value);
+    const threshold = 10 ** -digits;
+
+    if (abs < threshold) {
+      return value.toExponential(2);
+    }
+
     return value.toFixed(digits);
   }
 
@@ -519,9 +569,6 @@ export class ConfigLocalityExperiment {
       this.refs.localitySkippedSamples.textContent = String(result.samples.skippedNoGenotypeChange ?? 0);
     }
 
-    if (this.refs.localityRatioTable) {
-      this.refs.localityRatioTable.innerHTML = this.renderSummaryTable(result.summary.ratio);
-    }
 
     if (this.refs.localityDGTable) {
       this.refs.localityDGTable.innerHTML = this.renderSummaryTable(result.summary.dG);
@@ -545,22 +592,23 @@ export class ConfigLocalityExperiment {
   clear() {
     this.localityWorker?.terminate();
     this.localityWorker = null;
+    this.isRunning = false;
     this.result = null;
-    this.state = createDefaultLocalityState();
 
-    this.render();
-    this.cacheRefs();
-    this.bindEvents();
-    this.renderMutationParams();
-
-    if (this.refs.localityRatioTable) this.refs.localityRatioTable.innerHTML = '';
     if (this.refs.localityDGTable) this.refs.localityDGTable.innerHTML = '';
     if (this.refs.localityDPTable) this.refs.localityDPTable.innerHTML = '';
+
+    if (this.refs.localityRep) this.refs.localityRep.textContent = '—';
+    if (this.refs.localityVertices) this.refs.localityVertices.textContent = '—';
+    if (this.refs.localityMutType) this.refs.localityMutType.textContent = '—';
+    if (this.refs.localityMutParams) this.refs.localityMutParams.textContent = '—';
+    if (this.refs.localityRequestedSamples) this.refs.localityRequestedSamples.textContent = '—';
+    if (this.refs.localityValidSamples) this.refs.localityValidSamples.textContent = '—';
+    if (this.refs.localitySkippedSamples) this.refs.localitySkippedSamples.textContent = '—';
 
     this.syncUI();
     this.setBusy(false);
   }
-
   destroy() {
     this.localityWorker?.terminate();
     this.localityWorker = null;

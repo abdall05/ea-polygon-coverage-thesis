@@ -1,5 +1,4 @@
-// FitnessEvaluator.js
-import { PolygonGeometry } from '../geometry/PolygonGeometry';
+import { PolygonGeometry } from '../geometry/PolygonGeometry.js';
 
 export class FitnessEvaluator {
     constructor(targetPoints) {
@@ -8,12 +7,12 @@ export class FitnessEvaluator {
 
     evaluate(individual) {
         const polygon = individual.decodePolygon();
-
         const coverage = PolygonGeometry.calculateCoverage(polygon, this.targetPoints);
         const area = PolygonGeometry.polygonArea(polygon);
 
-        individual.fitness = { coverage, area };
-        return individual.fitness;
+        const fitness = { coverage, area };
+        individual.fitness = fitness;
+        return fitness;
     }
 
 }

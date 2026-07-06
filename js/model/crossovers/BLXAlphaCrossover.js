@@ -2,14 +2,10 @@ import { BaseCrossover } from './BaseCrossover.js';
 import { CROSSOVER_TYPES } from './crossoverConfig.js';
 
 export class BLXAlphaCrossover extends BaseCrossover {
-  type = CROSSOVER_TYPES.BLX_ALPHA;
+  static TYPE = CROSSOVER_TYPES.BLX_ALPHA;
 
   crossoverGenomes(c1, c2) {
     const alpha = this.params.alpha;
-
-    if (!Number.isFinite(alpha)) {
-      throw new Error(`${this.type} requires a valid alpha parameter`);
-    }
 
     for (let i = 0; i < c1.genome.length; i++) {
       const x1 = c1.genome[i];

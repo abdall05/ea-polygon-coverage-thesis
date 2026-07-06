@@ -1,12 +1,10 @@
 import { BasePolygonIndividual } from './BasePolygonIndividual.js';
 import { INDIVIDUAL_TYPES } from './individualConfig.js';
 import { PolygonGeometry } from '../geometry/PolygonGeometry.js';
+import { GEOMETRY_CONFIG } from '../geometry/geometryConfig.js';
 
 export class CartesianPolygonIndividual extends BasePolygonIndividual {
-  constructor(N, rng = null) {
-    super(INDIVIDUAL_TYPES.CARTESIAN, N, rng);
-    this.genome = this.generateGenome();
-  }
+  static TYPE = INDIVIDUAL_TYPES.CARTESIAN;
 
   generateGenome() {
     const points = PolygonGeometry.generateRandomPolygon(
@@ -19,11 +17,10 @@ export class CartesianPolygonIndividual extends BasePolygonIndividual {
     for (const p of points) {
       genome.push(p.x, p.y);
     }
-
     return genome;
   }
 
-  decodePolygon() {
+  genomeToPoints() {
     const rawPoints = [];
 
     for (let i = 0; i < this.genome.length; i += 2) {
@@ -33,19 +30,9 @@ export class CartesianPolygonIndividual extends BasePolygonIndividual {
       });
     }
 
-    return PolygonGeometry.fixPolygonOrder(rawPoints);
+    return rawPoints;
   }
 
-  clone() {
-    const copy = Object.create(CartesianPolygonIndividual.prototype);
-    copy.N = this.N;
-    copy.type = this.type;
-    copy.rng = this.rng;
-    copy.genome = [...this.genome];
-    copy.fitness = { ...this.fitness };
-    copy.lineage = this.lineage;
-    return copy;
-  }
 
   clampGenome() {
     const rawPoints = [];
@@ -70,9 +57,18 @@ export class CartesianPolygonIndividual extends BasePolygonIndividual {
       return 0;
     }
 
+    const min = GEOMETRY_CONFIG.WORLD_MIN;
+    const max = GEOMETRY_CONFIG.WORLD_MAX;
+    const range = max - min;
+
+    if (range <= 0) {
+      return 0;
+    }
+
     let sum = 0;
+
     for (let i = 0; i < this.genome.length; i++) {
-      sum += Math.abs(this.genome[i] - other.genome[i]);
+      sum += Math.abs(this.genome[i] - other.genome[i]) / range;
     }
 
     return sum / this.genome.length;
